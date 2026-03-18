@@ -2,4 +2,11 @@
 <resources>
 
     <style name="Theme.ToneMender" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.ToneMender.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#3B82F6</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.ToneMender</item>
+    </style>
+
 </resources>
