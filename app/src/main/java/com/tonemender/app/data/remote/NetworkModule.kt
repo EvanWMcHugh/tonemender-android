@@ -28,7 +28,7 @@ object NetworkModule {
                 val originalRequest = chain.request()
 
                 val requestWithHeaders = originalRequest.newBuilder()
-                    .addHeader("X-ToneMender-Client", "android")
+                    .addHeader("x-client-platform", "android")
                     .build()
 
                 chain.proceed(requestWithHeaders)
