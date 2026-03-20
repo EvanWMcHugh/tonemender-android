@@ -7,6 +7,7 @@ import com.tonemender.app.data.remote.model.ForgotPasswordRequest
 import com.tonemender.app.data.remote.model.GenericMessageResponse
 import com.tonemender.app.data.remote.model.GooglePlayVerifyRequest
 import com.tonemender.app.data.remote.model.MeResponse
+import com.tonemender.app.data.remote.model.ResendEmailVerificationRequest
 import com.tonemender.app.data.remote.model.SignInRequest
 import com.tonemender.app.data.remote.model.SignUpRequest
 import retrofit2.Response
@@ -54,6 +55,20 @@ class AuthRepository {
     ): Response<GenericMessageResponse> {
         return NetworkModule.api.forgotPassword(
             ForgotPasswordRequest(
+                email = email,
+                integrityToken = integrityToken,
+                integrityRequestHash = integrityRequestHash
+            )
+        )
+    }
+
+    suspend fun resendEmailVerification(
+        email: String,
+        integrityToken: String? = null,
+        integrityRequestHash: String? = null
+    ): Response<GenericMessageResponse> {
+        return NetworkModule.api.resendEmailVerification(
+            ResendEmailVerificationRequest(
                 email = email,
                 integrityToken = integrityToken,
                 integrityRequestHash = integrityRequestHash

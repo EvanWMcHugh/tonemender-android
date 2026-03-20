@@ -11,6 +11,7 @@ import com.tonemender.app.data.remote.model.GooglePlayVerifyRequest
 import com.tonemender.app.data.remote.model.MeResponse
 import com.tonemender.app.data.remote.model.RewriteRequest
 import com.tonemender.app.data.remote.model.RewriteResponse
+import com.tonemender.app.data.remote.model.ResendEmailVerificationRequest
 import com.tonemender.app.data.remote.model.SignInRequest
 import com.tonemender.app.data.remote.model.SignUpRequest
 import com.tonemender.app.data.remote.model.UpdateDraftRequest
@@ -38,6 +39,11 @@ interface ToneMenderApi {
     @POST("api/auth/request-password-reset")
     suspend fun forgotPassword(
         @Body body: ForgotPasswordRequest
+    ): Response<GenericMessageResponse>
+
+    @POST("api/auth/resend-email-verification")
+    suspend fun resendEmailVerification(
+        @Body body: ResendEmailVerificationRequest
     ): Response<GenericMessageResponse>
 
     @POST("api/auth/request-email-change")

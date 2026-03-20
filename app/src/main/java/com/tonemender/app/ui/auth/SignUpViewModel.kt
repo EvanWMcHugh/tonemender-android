@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.tonemender.app.data.remote.ApiErrorParser
 import com.tonemender.app.data.repository.AuthRepository
 import com.tonemender.app.data.security.PlayIntegrityManager
-import com.tonemender.app.ui.common.UiMessageManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,21 +24,24 @@ class SignUpViewModel(
     fun updateEmail(value: String) {
         _uiState.value = _uiState.value.copy(
             email = value,
-            errorMessage = null
+            errorMessage = null,
+            verificationResendMessage = null
         )
     }
 
     fun updatePassword(value: String) {
         _uiState.value = _uiState.value.copy(
             password = value,
-            errorMessage = null
+            errorMessage = null,
+            verificationResendMessage = null
         )
     }
 
     fun updateConfirmPassword(value: String) {
         _uiState.value = _uiState.value.copy(
             confirmPassword = value,
-            errorMessage = null
+            errorMessage = null,
+            verificationResendMessage = null
         )
     }
 
@@ -94,7 +96,8 @@ class SignUpViewModel(
 
         _uiState.value = _uiState.value.copy(
             isLoading = true,
-            errorMessage = null
+            errorMessage = null,
+            verificationResendMessage = null
         )
 
         viewModelScope.launch {
@@ -134,9 +137,10 @@ class SignUpViewModel(
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = null
+                        errorMessage = null,
+                        didCreateAccount = true,
+                        verificationResendMessage = null
                     )
-                    UiMessageManager.showMessage("Account created. Check your email to confirm your account.")
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -146,6 +150,77 @@ class SignUpViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    errorMessage = e.message ?: "Network error."
+                )
+            }
+        }
+    }
+
+    fun resendVerificationEmail() {
+        val email = _uiState.value.email.trim()
+
+        if (email.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "Enter your email first.",
+                verificationResendMessage = null
+            )
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(
+            isResendingVerification = true,
+            errorMessage = null,
+            verificationResendMessage = null
+        )
+
+        viewModelScope.launch {
+            try {
+                val requestHash = PlayIntegrityManager.buildRequestHash(
+                    "resend_email_verification",
+                    email
+                )
+
+                val prepareResult = playIntegrityManager.prepare()
+                if (prepareResult.isFailure) {
+                    _uiState.value = _uiState.value.copy(
+                        isResendingVerification = false,
+                        errorMessage = prepareResult.exceptionOrNull()?.message
+                            ?: "Could not prepare integrity check."
+                    )
+                    return@launch
+                }
+
+                val tokenResult = playIntegrityManager.requestToken(requestHash)
+                val integrityToken = tokenResult.getOrElse {
+                    _uiState.value = _uiState.value.copy(
+                        isResendingVerification = false,
+                        errorMessage = it.message ?: "Could not get integrity token."
+                    )
+                    return@launch
+                }
+
+                val response = authRepository.resendEmailVerification(
+                    email = email,
+                    integrityToken = integrityToken,
+                    integrityRequestHash = requestHash
+                )
+
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        isResendingVerification = false,
+                        verificationResendMessage =
+                            "If that account exists and still needs verification, we sent a confirmation email."
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isResendingVerification = false,
+                        errorMessage = ApiErrorParser.parseMessage(response)
+                            ?: "Could not resend verification email."
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isResendingVerification = false,
                     errorMessage = e.message ?: "Network error."
                 )
             }

@@ -23,6 +23,12 @@ data class ForgotPasswordRequest(
     val integrityRequestHash: String? = null
 )
 
+data class ResendEmailVerificationRequest(
+    val email: String,
+    val integrityToken: String? = null,
+    val integrityRequestHash: String? = null
+)
+
 data class ChangeEmailRequest(
     val newEmail: String,
     val integrityToken: String? = null,

@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -35,6 +35,12 @@ fun SignInScreen(
     viewModel: SignInViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    val onSignInClick = {
+        viewModel.signIn {
+            sessionViewModel.setSignedIn(true)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -112,19 +118,34 @@ fun SignInScreen(
                                 text = "If you already created your account, request a new verification email and then try signing in again.",
                                 style = MaterialTheme.typography.bodySmall
                             )
+
+                            TextButton(
+                                onClick = { viewModel.resendVerificationEmail() },
+                                enabled = !uiState.isLoading &&
+                                        !uiState.isResendingVerification &&
+                                        uiState.email.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (uiState.isResendingVerification) {
+                                    CircularProgressIndicator(strokeWidth = 2.dp)
+                                } else {
+                                    Text("Resend verification email")
+                                }
+                            }
+
+                            uiState.verificationResendMessage?.let {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         }
                     }
                 }
 
                 Button(
-                    onClick = {
-                        viewModel.signIn(
-                            onSuccess = {
-                                sessionViewModel.setSignedIn(true)
-                            }
-                        )
-                    },
-                    enabled = !uiState.isLoading,
+                    onClick = onSignInClick,
+                    enabled = !uiState.isLoading && !uiState.isResendingVerification,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (uiState.isLoading) {
