@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -27,9 +27,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun ForgotPasswordScreen(
     onBack: () -> Unit,
+    prefilledEmail: String = "",
     viewModel: ForgotPasswordViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    if (prefilledEmail.isNotBlank() && uiState.email.isBlank()) {
+        viewModel.updateEmail(prefilledEmail)
+    }
 
     Column(
         modifier = Modifier
@@ -39,67 +44,96 @@ fun ForgotPasswordScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
+        ForgotPasswordHeader()
+
+        ForgotPasswordForm(
+            email = uiState.email,
+            errorMessage = uiState.errorMessage,
+            isLoading = uiState.isLoading,
+            onEmailChange = viewModel::updateEmail,
+            onSubmit = {
+                viewModel.submit(onSuccess = onBack)
+            },
+            onBack = onBack
+        )
+    }
+}
+
+@Composable
+private fun ForgotPasswordHeader() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "Forgot Password",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Text(
+            text = "Enter your email and we’ll send you a password reset link.",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun ForgotPasswordForm(
+    email: String,
+    errorMessage: String?,
+    isLoading: Boolean,
+    onEmailChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onBack: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Forgot Password",
-                style = MaterialTheme.typography.headlineMedium
+            OutlinedTextField(
+                value = email,
+                onValueChange = onEmailChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Email") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
-            Text(
-                text = "Enter your email and we’ll send you a password reset link.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+            errorMessage?.let {
+                ErrorText(it)
+            }
 
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Button(
+                onClick = onSubmit,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = uiState.email,
-                    onValueChange = viewModel::updateEmail,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Email") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                )
-
-                uiState.errorMessage?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                if (isLoading) {
+                    CircularProgressIndicator(strokeWidth = 2.dp)
+                } else {
+                    Text("Send Reset Link")
                 }
+            }
 
-                Button(
-                    onClick = {
-                        viewModel.submit(onSuccess = onBack)
-                    },
-                    enabled = !uiState.isLoading,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(strokeWidth = 2.dp)
-                    } else {
-                        Text("Send Reset Link")
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = onBack,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Back")
-                }
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Back")
             }
         }
     }
+}
+
+@Composable
+private fun ErrorText(message: String) {
+    Text(
+        text = message,
+        color = MaterialTheme.colorScheme.error
+    )
 }

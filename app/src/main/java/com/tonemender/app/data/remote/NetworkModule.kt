@@ -5,7 +5,6 @@ import com.google.gson.GsonBuilder
 import com.tonemender.app.BuildConfig
 import com.tonemender.app.data.local.cookies.PersistentCookieJar
 import com.tonemender.app.data.remote.api.ToneMenderApi
-import com.tonemender.app.data.remote.config.AppConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -13,51 +12,76 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object NetworkModule {
+
+    @Volatile
     private var cookieJar: PersistentCookieJar? = null
+
+    @Volatile
     private var retrofit: Retrofit? = null
+
+    @Volatile
     private var apiInstance: ToneMenderApi? = null
 
     fun init(context: Context) {
         if (apiInstance != null) return
 
-        cookieJar = PersistentCookieJar(context.applicationContext)
+        synchronized(this) {
+            if (apiInstance != null) return
 
-        val okHttpClientBuilder = OkHttpClient.Builder()
-            .cookieJar(cookieJar!!)
+            val appContext = context.applicationContext
+            val jar = PersistentCookieJar(appContext)
+            val okHttpClient = buildOkHttpClient(jar)
+            val retrofitInstance = buildRetrofit(okHttpClient)
+
+            cookieJar = jar
+            retrofit = retrofitInstance
+            apiInstance = retrofitInstance.create(ToneMenderApi::class.java)
+        }
+    }
+
+    val api: ToneMenderApi
+        get() = apiInstance
+            ?: error("NetworkModule.init(context) must be called before using api")
+
+    fun clearSessionCookies() {
+        cookieJar?.clear()
+    }
+
+    private fun buildOkHttpClient(cookieJar: PersistentCookieJar): OkHttpClient {
+        val builder = OkHttpClient.Builder()
+            .cookieJar(cookieJar)
             .addInterceptor { chain ->
-                val originalRequest = chain.request()
-
-                val requestWithHeaders = originalRequest.newBuilder()
+                val request = chain.request().newBuilder()
                     .addHeader("x-client-platform", "android")
                     .addHeader("X-ToneMender-Client", "android")
                     .build()
 
-                chain.proceed(requestWithHeaders)
+                chain.proceed(request)
             }
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
 
         if (BuildConfig.DEBUG) {
-            val loggingInterceptor = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            }
-            okHttpClientBuilder.addInterceptor(loggingInterceptor)
+            builder.addInterceptor(
+                HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BODY
+                }
+            )
         }
 
-        retrofit = Retrofit.Builder()
-            .baseUrl(AppConfig.BASE_URL)
-            .client(okHttpClientBuilder.build())
-            .addConverterFactory(GsonConverterFactory.create(GsonBuilder().create()))
-            .build()
-
-        apiInstance = retrofit!!.create(ToneMenderApi::class.java)
+        return builder.build()
     }
 
-    val api: ToneMenderApi
-        get() = apiInstance ?: error("NetworkModule.init(context) must be called before using api")
-
-    fun clearSessionCookies() {
-        cookieJar?.clear()
+    private fun buildRetrofit(client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(BuildConfig.BASE_URL)
+            .client(client)
+            .addConverterFactory(
+                GsonConverterFactory.create(
+                    GsonBuilder().create()
+                )
+            )
+            .build()
     }
 }

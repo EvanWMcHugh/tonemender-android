@@ -9,9 +9,9 @@ import com.tonemender.app.data.remote.model.ForgotPasswordRequest
 import com.tonemender.app.data.remote.model.GenericMessageResponse
 import com.tonemender.app.data.remote.model.GooglePlayVerifyRequest
 import com.tonemender.app.data.remote.model.MeResponse
+import com.tonemender.app.data.remote.model.ResendEmailVerificationRequest
 import com.tonemender.app.data.remote.model.RewriteRequest
 import com.tonemender.app.data.remote.model.RewriteResponse
-import com.tonemender.app.data.remote.model.ResendEmailVerificationRequest
 import com.tonemender.app.data.remote.model.SignInRequest
 import com.tonemender.app.data.remote.model.SignUpRequest
 import com.tonemender.app.data.remote.model.UpdateDraftRequest
@@ -26,62 +26,66 @@ import retrofit2.http.Path
 
 interface ToneMenderApi {
 
+    // Auth
     @POST("api/auth/sign-in")
     suspend fun signIn(
-        @Body body: SignInRequest
+        @Body request: SignInRequest
     ): Response<MeResponse>
 
     @POST("api/auth/sign-up")
     suspend fun signUp(
-        @Body body: SignUpRequest
+        @Body request: SignUpRequest
     ): Response<GenericMessageResponse>
 
     @POST("api/auth/request-password-reset")
-    suspend fun forgotPassword(
-        @Body body: ForgotPasswordRequest
+    suspend fun requestPasswordReset(
+        @Body request: ForgotPasswordRequest
     ): Response<GenericMessageResponse>
 
     @POST("api/auth/resend-email-verification")
     suspend fun resendEmailVerification(
-        @Body body: ResendEmailVerificationRequest
+        @Body request: ResendEmailVerificationRequest
     ): Response<GenericMessageResponse>
 
     @POST("api/auth/request-email-change")
-    suspend fun changeEmail(
-        @Body body: ChangeEmailRequest
+    suspend fun requestEmailChange(
+        @Body request: ChangeEmailRequest
     ): Response<GenericMessageResponse>
-
-    @POST("api/user/delete-account")
-    suspend fun deleteAccount(
-        @Body body: DeleteAccountRequest
-    ): Response<GenericMessageResponse>
-
-    @GET("api/user/me")
-    suspend fun me(): Response<MeResponse>
 
     @POST("api/auth/sign-out")
     suspend fun signOut(): Response<GenericMessageResponse>
 
+    // User
+    @GET("api/user/me")
+    suspend fun getMe(): Response<MeResponse>
+
+    @POST("api/user/delete-account")
+    suspend fun deleteAccount(
+        @Body request: DeleteAccountRequest
+    ): Response<GenericMessageResponse>
+
+    // Rewrite
     @POST("api/rewrite")
     suspend fun rewrite(
-        @Body body: RewriteRequest
+        @Body request: RewriteRequest
     ): Response<RewriteResponse>
 
     @GET("api/usage/stats")
     suspend fun getUsageStats(): Response<UsageStatsResponse>
 
+    // Drafts / Messages
     @GET("api/messages")
     suspend fun getDrafts(): Response<DraftsResponse>
 
     @POST("api/messages")
     suspend fun createDraft(
-        @Body body: CreateDraftRequest
+        @Body request: CreateDraftRequest
     ): Response<DraftResponse>
 
     @PUT("api/messages/{draftId}")
     suspend fun updateDraft(
         @Path("draftId") draftId: String,
-        @Body body: UpdateDraftRequest
+        @Body request: UpdateDraftRequest
     ): Response<DraftResponse>
 
     @DELETE("api/messages/{draftId}")
@@ -89,8 +93,9 @@ interface ToneMenderApi {
         @Path("draftId") draftId: String
     ): Response<GenericMessageResponse>
 
+    // Billing
     @POST("api/billing/google/verify")
     suspend fun verifyGooglePlayPurchase(
-        @Body body: GooglePlayVerifyRequest
+        @Body request: GooglePlayVerifyRequest
     ): Response<GenericMessageResponse>
 }

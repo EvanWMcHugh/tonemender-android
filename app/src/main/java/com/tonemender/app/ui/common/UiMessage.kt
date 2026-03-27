@@ -5,11 +5,18 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 object UiMessageManager {
-    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 10)
+
+    private const val BUFFER_CAPACITY = 10
+
+    private val _messages = MutableSharedFlow<String>(
+        extraBufferCapacity = BUFFER_CAPACITY
+    )
+
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
     fun showMessage(message: String) {
-        if (message.isBlank()) return
-        _messages.tryEmit(message)
+        val trimmed = message.trim()
+        if (trimmed.isEmpty()) return
+        _messages.tryEmit(trimmed)
     }
 }

@@ -8,7 +8,6 @@ import com.tonemender.app.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class SessionViewModel(application: Application) : AndroidViewModel(application) {
@@ -24,45 +23,54 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         viewModelScope.launch {
-            sessionStore.isSignedInFlow
-                .combine(sessionStore.refreshTriggerFlow) { signedIn, _ -> signedIn }
-                .collect { signedIn ->
-                    _isReady.value = false
-
-                    if (signedIn) {
-                        validateSession()
-                    } else {
-                        _isSignedIn.value = false
-                        _isReady.value = true
-                    }
+            sessionStore.isSignedInFlow.collect { signedIn ->
+                if (signedIn) {
+                    validateSession()
+                } else {
+                    markSignedOutReady()
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            sessionStore.refreshTriggerFlow.collect {
+                if (sessionStore.isSignedIn()) {
+                    validateSession()
+                } else {
+                    markSignedOutReady()
+                }
+            }
         }
     }
 
     private suspend fun validateSession() {
-        try {
-            val response = authRepository.me()
+        _isReady.value = false
 
-            if (response.isSuccessful && response.body()?.user != null) {
+        try {
+            val response = authRepository.getMe()
+            val user = response.body()?.user
+
+            if (response.isSuccessful && user != null) {
                 _isSignedIn.value = true
             } else {
-                authRepository.clearSession()
-                sessionStore.clear()
-                _isSignedIn.value = false
+                clearLocalSessionState()
             }
         } catch (_: Exception) {
-            authRepository.clearSession()
-            sessionStore.clear()
-            _isSignedIn.value = false
+            clearLocalSessionState()
+        } finally {
+            _isReady.value = true
         }
-
-        _isReady.value = true
     }
 
     fun setSignedIn(value: Boolean) {
         viewModelScope.launch {
             _isReady.value = false
             sessionStore.setSignedIn(value)
+
+            if (!value) {
+                _isSignedIn.value = false
+                _isReady.value = true
+            }
         }
     }
 
@@ -73,12 +81,23 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             try {
                 authRepository.signOut()
             } catch (_: Exception) {
+                // Intentionally ignored:
+                // local sign-out should still succeed even if the network request fails.
             }
 
-            authRepository.clearSession()
-            sessionStore.clear()
-            _isSignedIn.value = false
+            clearLocalSessionState()
             _isReady.value = true
         }
+    }
+
+    private suspend fun clearLocalSessionState() {
+        authRepository.clearSession()
+        sessionStore.clear()
+        _isSignedIn.value = false
+    }
+
+    private fun markSignedOutReady() {
+        _isSignedIn.value = false
+        _isReady.value = true
     }
 }

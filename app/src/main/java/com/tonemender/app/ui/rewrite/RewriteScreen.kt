@@ -4,32 +4,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -50,7 +29,7 @@ fun RewriteScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clipboard = rememberClipboard(context)
 
     LaunchedEffect(Unit) {
         viewModel.refreshUser()
@@ -72,411 +51,269 @@ fun RewriteScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+
+        HeaderSection(uiState.isPro, uiState.editingDraftId != null, onGoToUpgrade)
+
+        MessageInputSection(uiState, viewModel)
+
+        if (uiState.isPro) {
+            ToneSection(uiState, viewModel)
+            RecipientSection(uiState, viewModel)
+        } else {
+            ProUpsellCard(onGoToUpgrade)
+        }
+
+        RewriteButton(
+            isLoading = uiState.isLoading,
+            enabled = uiState.canRewrite,
+            onClick = viewModel::rewrite
+        )
+
+        uiState.errorMessage?.let {
+            ErrorText(it)
+        }
+
+        if (uiState.hasRewrite) {
+            RewriteResultSection(uiState, viewModel, clipboard, context)
+        }
+
+        NavigationSection(onGoToDrafts, onGoToAccount, onGoToUpgrade)
+
+        UsageText(uiState)
+    }
+}
+
+/* ---------- Sections ---------- */
+
+@Composable
+private fun HeaderSection(isPro: Boolean, isEditing: Boolean, onUpgrade: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("ToneMender Rewrite", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                if (isEditing) "Editing saved draft"
+                else "Rewrite your message with a better tone",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        AssistChip(
+            onClick = { if (!isPro) onUpgrade() },
+            label = { Text(if (isPro) "Pro" else "Free") }
+        )
+    }
+}
+
+@Composable
+private fun MessageInputSection(uiState: RewriteUiState, viewModel: RewriteViewModel) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedTextField(
+                value = uiState.message,
+                onValueChange = viewModel::updateMessage,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Original message") },
+                minLines = 6,
+                maxLines = 12
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "ToneMender Rewrite",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                Text("${uiState.messageCount}/2000", style = MaterialTheme.typography.bodySmall)
 
-                    Text(
-                        text = if (uiState.editingDraftId != null) {
-                            "Editing saved draft"
-                        } else {
-                            "Rewrite your message with a better tone"
-                        },
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                AssistChip(
-                    onClick = {
-                        if (!uiState.isPro) onGoToUpgrade()
-                    },
-                    label = {
-                        Text(if (uiState.isPro) "Pro" else "Free")
-                    }
-                )
-            }
-        }
-
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = uiState.message,
-                    onValueChange = viewModel::updateMessage,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Original message") },
-                    placeholder = { Text("Paste or type the message you want rewritten") },
-                    minLines = 6,
-                    maxLines = 12
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "${uiState.messageCount}/2000",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-
-                    if (uiState.hasEditedOriginalSinceRewrite) {
-                        TextButton(
-                            onClick = viewModel::revertToOriginalMessage
-                        ) {
-                            Text("Revert to original")
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = viewModel::clearOriginalMessage,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Clear")
+                if (uiState.hasEditedOriginalSinceRewrite) {
+                    TextButton(onClick = viewModel::revertToOriginalMessage) {
+                        Text("Revert to original")
                     }
                 }
             }
-        }
 
-        if (uiState.isPro) {
-            Card(
+            OutlinedButton(
+                onClick = viewModel::clearOriginalMessage,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Tone",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        toneOptions.forEach { tone ->
-                            FilterChip(
-                                selected = uiState.selectedTone == tone,
-                                onClick = {
-                                    viewModel.updateTone(
-                                        if (uiState.selectedTone == tone) null else tone
-                                    )
-                                },
-                                label = { Text(tone.replaceFirstChar { it.uppercase() }) }
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = "Selected tone: ${uiState.selectedTone ?: "None"}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Recipient",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        recipientOptions.forEach { recipient ->
-                            FilterChip(
-                                selected = uiState.selectedRecipient == recipient,
-                                onClick = {
-                                    viewModel.updateRecipient(
-                                        if (uiState.selectedRecipient == recipient) null else recipient
-                                    )
-                                },
-                                label = { Text(recipient.replaceFirstChar { it.uppercase() }) }
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = "Selected recipient: ${uiState.selectedRecipient ?: "None"}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        } else {
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Tone + Recipient are Pro features",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Text(
-                        text = "Upgrade to ToneMender Pro to choose the tone and recipient for more tailored rewrites.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    OutlinedButton(
-                        onClick = onGoToUpgrade,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Upgrade to Pro")
-                    }
-                }
+                Text("Clear")
             }
         }
+    }
+}
 
-        Button(
-            onClick = { viewModel.rewrite() },
-            enabled = uiState.canRewrite,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(strokeWidth = 2.dp)
-            } else {
-                Text("Rewrite")
-            }
+@Composable
+private fun ToneSection(uiState: RewriteUiState, viewModel: RewriteViewModel) {
+    SelectionCard(
+        title = "Tone",
+        selected = uiState.selectedTone,
+        options = toneOptions,
+        onSelect = { value ->
+            viewModel.updateTone(if (uiState.selectedTone == value) null else value)
         }
+    )
+}
 
-        uiState.errorMessage?.let {
+@Composable
+private fun RecipientSection(uiState: RewriteUiState, viewModel: RewriteViewModel) {
+    SelectionCard(
+        title = "Recipient",
+        selected = uiState.selectedRecipient,
+        options = recipientOptions,
+        onSelect = { value ->
+            viewModel.updateRecipient(if (uiState.selectedRecipient == value) null else value)
+        }
+    )
+}
+
+@Composable
+private fun SelectionCard(
+    title: String,
+    selected: String?,
+    options: List<String>,
+    onSelect: (String) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEach {
+                    FilterChip(
+                        selected = selected == it,
+                        onClick = { onSelect(it) },
+                        label = { Text(it.replaceFirstChar { c -> c.uppercase() }) }
+                    )
+                }
+            }
+
             Text(
-                text = it,
-                color = MaterialTheme.colorScheme.error
+                text = "Selected: ${selected ?: "None"}",
+                style = MaterialTheme.typography.bodySmall
             )
         }
+    }
+}
 
-        if (uiState.hasRewrite) {
-            ElevatedCard(
+@Composable
+private fun ProUpsellCard(onUpgrade: () -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Tone + Recipient are Pro features", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Upgrade to ToneMender Pro for better rewrites.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            OutlinedButton(onClick = onUpgrade, modifier = Modifier.fillMaxWidth()) {
+                Text("Upgrade to Pro")
+            }
+        }
+    }
+}
+
+@Composable
+private fun RewriteButton(isLoading: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (isLoading) CircularProgressIndicator(strokeWidth = 2.dp)
+        else Text("Rewrite")
+    }
+}
+
+@Composable
+private fun RewriteResultSection(
+    uiState: RewriteUiState,
+    viewModel: RewriteViewModel,
+    clipboard: ClipboardManager,
+    context: Context
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+
+            OutlinedTextField(
+                value = uiState.rewrittenMessage,
+                onValueChange = {},
+                readOnly = true,
                 modifier = Modifier.fillMaxWidth()
+            )
+
+            Button(onClick = viewModel::saveDraft, modifier = Modifier.fillMaxWidth()) {
+                Text(if (uiState.editingDraftId != null) "Update Draft" else "Save Draft")
+            }
+
+            OutlinedButton(onClick = viewModel::useRewriteAsOriginal) {
+                Text("Use this")
+            }
+
+            OutlinedButton(
+                onClick = {
+                    clipboard.setPrimaryClip(
+                        ClipData.newPlainText("Rewrite", uiState.rewrittenMessage)
+                    )
+                    viewModel.copyRewriteToClipboard()
+                }
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Rewritten message",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                Text("Copy")
+            }
 
-                    OutlinedTextField(
-                        value = uiState.rewrittenMessage,
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 6,
-                        maxLines = 12
-                    )
-
-                    Button(
-                        onClick = { viewModel.saveDraft() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            if (uiState.editingDraftId != null) {
-                                "Update Draft"
-                            } else {
-                                "Save Draft"
-                            }
-                        )
-                    }
-
-                    OutlinedButton(
-                        onClick = viewModel::useRewriteAsOriginal,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Use this")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            val clip = ClipData.newPlainText(
-                                "ToneMender Rewrite",
-                                uiState.rewrittenMessage
-                            )
-                            clipboard.setPrimaryClip(clip)
-                            viewModel.copyRewriteToClipboard()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Copy Rewrite")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.shareRewrite()
-                            val shareIntent = Intent().apply {
+            OutlinedButton(
+                onClick = {
+                    viewModel.shareRewrite()
+                    context.startActivity(
+                        Intent.createChooser(
+                            Intent().apply {
                                 action = Intent.ACTION_SEND
                                 putExtra(Intent.EXTRA_TEXT, uiState.rewrittenMessage)
                                 type = "text/plain"
-                            }
-
-                            val chooser = Intent.createChooser(shareIntent, "Share rewrite")
-                            context.startActivity(chooser)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Share Rewrite")
-                    }
-                }
-            }
-
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Before & After",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Text(
-                        text = "Before",
-                        style = MaterialTheme.typography.labelLarge
-                    )
-
-                    OutlinedTextField(
-                        value = uiState.beforeMessage,
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
-                        maxLines = 8
-                    )
-
-                    Text(
-                        text = "After",
-                        style = MaterialTheme.typography.labelLarge
-                    )
-
-                    OutlinedTextField(
-                        value = uiState.rewrittenMessage,
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
-                        maxLines = 8
-                    )
-
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.shareBeforeAfter()
-
-                            val shareText = buildString {
-                                appendLine("Before:")
-                                appendLine(uiState.beforeMessage)
-                                appendLine()
-                                appendLine("After:")
-                                appendLine(uiState.rewrittenMessage)
-                            }
-
-                            val shareIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, shareText)
-                                type = "text/plain"
-                            }
-
-                            val chooser = Intent.createChooser(shareIntent, "Share before & after")
-                            context.startActivity(chooser)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Share Before & After")
-                    }
-                }
-            }
-
-            if (uiState.toneScore != null || !uiState.emotionalImpact.isNullOrBlank()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "Analysis",
-                            style = MaterialTheme.typography.titleMedium
+                            },
+                            "Share rewrite"
                         )
-
-                        uiState.toneScore?.let { score ->
-                            Text(
-                                text = "Tone score: $score",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-
-                        uiState.emotionalImpact?.takeIf { it.isNotBlank() }?.let { impact ->
-                            Text(
-                                text = "Emotional impact: $impact",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
+                    )
                 }
+            ) {
+                Text("Share")
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(8.dp))
+@Composable
+private fun NavigationSection(
+    onGoToDrafts: () -> Unit,
+    onGoToAccount: () -> Unit,
+    onGoToUpgrade: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = onGoToDrafts) { Text("Drafts") }
+        TextButton(onClick = onGoToAccount) { Text("Account") }
+        TextButton(onClick = onGoToUpgrade) { Text("Upgrade") }
+    }
+}
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            TextButton(
-                onClick = onGoToDrafts,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Drafts")
-            }
+@Composable
+private fun UsageText(uiState: RewriteUiState) {
+    Text(
+        text = "Usage today: ${uiState.usageToday} • Total rewrites: ${uiState.usageTotal}",
+        style = MaterialTheme.typography.bodySmall
+    )
+}
 
-            TextButton(
-                onClick = onGoToAccount,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Account")
-            }
+@Composable
+private fun ErrorText(message: String) {
+    Text(message, color = MaterialTheme.colorScheme.error)
+}
 
-            TextButton(
-                onClick = onGoToUpgrade,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Upgrade")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Usage today: ${uiState.usageToday} • Total rewrites: ${uiState.usageTotal}",
-            style = MaterialTheme.typography.bodySmall
-        )
+@Composable
+private fun rememberClipboard(context: Context): ClipboardManager {
+    return remember(context) {
+        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     }
 }

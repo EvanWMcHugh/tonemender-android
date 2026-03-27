@@ -23,21 +23,25 @@ class SignInViewModel(
     val uiState: StateFlow<SignInUiState> = _uiState.asStateFlow()
 
     fun updateEmail(value: String) {
-        _uiState.value = _uiState.value.copy(
-            email = value,
-            errorMessage = null,
-            likelyNeedsVerification = false,
-            verificationResendMessage = null
-        )
+        updateState {
+            copy(
+                email = value,
+                errorMessage = null,
+                likelyNeedsVerification = false,
+                verificationResendMessage = null
+            )
+        }
     }
 
     fun updatePassword(value: String) {
-        _uiState.value = _uiState.value.copy(
-            password = value,
-            errorMessage = null,
-            likelyNeedsVerification = false,
-            verificationResendMessage = null
-        )
+        updateState {
+            copy(
+                password = value,
+                errorMessage = null,
+                likelyNeedsVerification = false,
+                verificationResendMessage = null
+            )
+        }
     }
 
     fun signIn(onSuccess: () -> Unit) {
@@ -45,79 +49,70 @@ class SignInViewModel(
         val password = _uiState.value.password
 
         if (email.isBlank() || password.isBlank()) {
-            _uiState.value = _uiState.value.copy(
-                errorMessage = "Enter your email and password.",
-                likelyNeedsVerification = false,
-                verificationResendMessage = null
-            )
+            updateState {
+                copy(
+                    errorMessage = "Enter your email and password.",
+                    likelyNeedsVerification = false,
+                    verificationResendMessage = null
+                )
+            }
             return
         }
 
-        _uiState.value = _uiState.value.copy(
-            isLoading = true,
-            isResendingVerification = false,
-            errorMessage = null,
-            likelyNeedsVerification = false,
-            verificationResendMessage = null
-        )
+        updateState {
+            copy(
+                isLoading = true,
+                isResendingVerification = false,
+                errorMessage = null,
+                likelyNeedsVerification = false,
+                verificationResendMessage = null
+            )
+        }
 
         viewModelScope.launch {
             try {
-                val requestHash = PlayIntegrityManager.buildRequestHash(
-                    "sign_in",
+                val integrityToken = getIntegrityToken(
+                    action = "sign_in",
                     email,
                     password
-                )
-
-                val prepareResult = playIntegrityManager.prepare()
-                if (prepareResult.isFailure) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = prepareResult.exceptionOrNull()?.message
-                            ?: "Could not prepare integrity check."
-                    )
-                    return@launch
-                }
-
-                val tokenResult = playIntegrityManager.requestToken(requestHash)
-                val integrityToken = tokenResult.getOrElse {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = it.message ?: "Could not get integrity token."
-                    )
-                    return@launch
-                }
+                ) ?: return@launch
 
                 val response = authRepository.signIn(
                     email = email,
                     password = password,
-                    integrityToken = integrityToken,
-                    integrityRequestHash = requestHash,
+                    integrityToken = integrityToken.token,
+                    integrityRequestHash = integrityToken.requestHash,
                     deviceName = buildDeviceName()
                 )
 
                 if (response.isSuccessful && response.body()?.user != null) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = null,
-                        likelyNeedsVerification = false,
-                        verificationResendMessage = null
-                    )
+                    updateState {
+                        copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            likelyNeedsVerification = false,
+                            verificationResendMessage = null
+                        )
+                    }
                     onSuccess()
                 } else {
                     val message = ApiErrorParser.parseMessage(response) ?: "Sign in failed."
 
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = message,
-                        likelyNeedsVerification = looksLikeVerificationIssue(message)
-                    )
+                    updateState {
+                        copy(
+                            isLoading = false,
+                            errorMessage = message,
+                            likelyNeedsVerification = looksLikeVerificationIssue(message)
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = e.message ?: "Network error."
-                )
+                updateState {
+                    copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "Network error."
+                    )
+                }
             }
         }
     }
@@ -126,71 +121,98 @@ class SignInViewModel(
         val email = _uiState.value.email.trim()
 
         if (email.isBlank()) {
-            _uiState.value = _uiState.value.copy(
-                errorMessage = "Enter your email first.",
-                verificationResendMessage = null
-            )
+            updateState {
+                copy(
+                    errorMessage = "Enter your email first.",
+                    verificationResendMessage = null
+                )
+            }
             return
         }
 
-        _uiState.value = _uiState.value.copy(
-            isResendingVerification = true,
-            errorMessage = null,
-            verificationResendMessage = null
-        )
+        updateState {
+            copy(
+                isResendingVerification = true,
+                errorMessage = null,
+                verificationResendMessage = null
+            )
+        }
 
         viewModelScope.launch {
             try {
-                val requestHash = PlayIntegrityManager.buildRequestHash(
-                    "resend_email_verification",
+                val integrityToken = getIntegrityToken(
+                    action = "resend_email_verification",
                     email
-                )
-
-                val prepareResult = playIntegrityManager.prepare()
-                if (prepareResult.isFailure) {
-                    _uiState.value = _uiState.value.copy(
-                        isResendingVerification = false,
-                        errorMessage = prepareResult.exceptionOrNull()?.message
-                            ?: "Could not prepare integrity check."
-                    )
-                    return@launch
-                }
-
-                val tokenResult = playIntegrityManager.requestToken(requestHash)
-                val integrityToken = tokenResult.getOrElse {
-                    _uiState.value = _uiState.value.copy(
-                        isResendingVerification = false,
-                        errorMessage = it.message ?: "Could not get integrity token."
-                    )
-                    return@launch
-                }
+                ) ?: return@launch
 
                 val response = authRepository.resendEmailVerification(
                     email = email,
-                    integrityToken = integrityToken,
-                    integrityRequestHash = requestHash
+                    integrityToken = integrityToken.token,
+                    integrityRequestHash = integrityToken.requestHash
                 )
 
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(
-                        isResendingVerification = false,
-                        verificationResendMessage =
-                            "If that account exists and still needs verification, we sent a confirmation email."
-                    )
+                    updateState {
+                        copy(
+                            isResendingVerification = false,
+                            verificationResendMessage =
+                                "If that account exists and still needs verification, we sent a confirmation email."
+                        )
+                    }
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isResendingVerification = false,
-                        errorMessage = ApiErrorParser.parseMessage(response)
-                            ?: "Could not resend verification email."
-                    )
+                    updateState {
+                        copy(
+                            isResendingVerification = false,
+                            errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: "Could not resend verification email."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isResendingVerification = false,
-                    errorMessage = e.message ?: "Network error."
-                )
+                updateState {
+                    copy(
+                        isResendingVerification = false,
+                        errorMessage = e.message ?: "Network error."
+                    )
+                }
             }
         }
+    }
+
+    // --- Helpers ---
+
+    private suspend fun getIntegrityToken(
+        action: String,
+        vararg inputs: String
+    ): IntegrityResult? {
+        val requestHash = PlayIntegrityManager.buildRequestHash(action, *inputs)
+
+        val prepareResult = playIntegrityManager.prepare()
+        if (prepareResult.isFailure) {
+            updateState {
+                copy(
+                    isLoading = false,
+                    isResendingVerification = false,
+                    errorMessage = prepareResult.exceptionOrNull()?.message
+                        ?: "Could not prepare integrity check."
+                )
+            }
+            return null
+        }
+
+        val tokenResult = playIntegrityManager.requestToken(requestHash)
+        val token = tokenResult.getOrElse {
+            updateState {
+                copy(
+                    isLoading = false,
+                    isResendingVerification = false,
+                    errorMessage = it.message ?: "Could not get integrity token."
+                )
+            }
+            return null
+        }
+
+        return IntegrityResult(token = token, requestHash = requestHash)
     }
 
     private fun buildDeviceName(): String {
@@ -212,4 +234,13 @@ class SignInViewModel(
                 normalized.contains("email confirmation") ||
                 normalized.contains("unverified")
     }
+
+    private inline fun updateState(transform: SignInUiState.() -> SignInUiState) {
+        _uiState.value = _uiState.value.transform()
+    }
+
+    private data class IntegrityResult(
+        val token: String,
+        val requestHash: String
+    )
 }

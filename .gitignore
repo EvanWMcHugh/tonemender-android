@@ -1,33 +1,43 @@
-# Gradle
+# -----------------------------
+# Gradle / Build
+# -----------------------------
 .gradle/
 build/
+app/build/
 
-# Local config
+# -----------------------------
+# Local configuration
+# -----------------------------
 local.properties
 
-# Android Studio
+# -----------------------------
+# Android Studio / IntelliJ
+# -----------------------------
 .idea/
 *.iml
 
+# -----------------------------
 # OS files
+# -----------------------------
 .DS_Store
 Thumbs.db
 
+# -----------------------------
 # Logs
+# -----------------------------
 *.log
 
-# Kotlin
+# -----------------------------
+# Kotlin / Generated
+# -----------------------------
 .kotlin/
-
-# Generated files
 captures/
 .externalNativeBuild/
 .cxx/
 
-# Signing files (VERY IMPORTANT)
+# -----------------------------
+# Signing (CRITICAL - never commit)
+# -----------------------------
 *.keystore
 *.jks
 keystore.properties
-
-# Build outputs
-app/build/

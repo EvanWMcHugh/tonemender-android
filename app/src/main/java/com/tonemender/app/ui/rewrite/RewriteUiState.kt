@@ -16,19 +16,20 @@ data class RewriteUiState(
     val usageToday: Int = 0,
     val usageTotal: Int = 0
 ) {
+
+    val trimmedMessage: String
+        get() = message.trim()
+
     val messageCount: Int
         get() = message.length
 
     val canRewrite: Boolean
-        get() = message.trim().isNotBlank() && !isLoading
+        get() = trimmedMessage.isNotEmpty() && !isLoading
 
     val hasRewrite: Boolean
         get() = rewrittenMessage.isNotBlank()
 
     val hasEditedOriginalSinceRewrite: Boolean
         get() = !originalMessageSnapshot.isNullOrBlank() &&
-                message.trim() != originalMessageSnapshot.trim()
-
-    val beforeMessage: String
-        get() = originalMessageSnapshot?.takeIf { it.isNotBlank() } ?: message
+                trimmedMessage != originalMessageSnapshot.trim()
 }

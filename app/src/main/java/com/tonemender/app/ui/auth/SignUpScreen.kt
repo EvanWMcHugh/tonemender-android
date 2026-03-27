@@ -40,26 +40,9 @@ fun SignUpScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "ToneMender",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Text(
-                text = if (uiState.didCreateAccount) {
-                    "Check your email"
-                } else {
-                    "Create your account"
-                },
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+        SignUpHeader(
+            didCreateAccount = uiState.didCreateAccount
+        )
 
         ElevatedCard(
             modifier = Modifier.fillMaxWidth()
@@ -69,103 +52,177 @@ fun SignUpScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (uiState.didCreateAccount) {
-                    Text(
-                        text = "We sent a confirmation link to ${uiState.email.trim()}. Confirm your email to activate your account.",
-                        style = MaterialTheme.typography.bodyMedium
+                    VerificationSentSection(
+                        email = uiState.email.trim(),
+                        errorMessage = uiState.errorMessage,
+                        verificationResendMessage = uiState.verificationResendMessage,
+                        isResendingVerification = uiState.isResendingVerification,
+                        onResendVerification = viewModel::resendVerificationEmail,
+                        onGoToSignIn = onGoToSignIn
                     )
-
-                    Text(
-                        text = "If you don’t see it, check your spam or junk folder.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-
-                    uiState.errorMessage?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    uiState.verificationResendMessage?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
-                    Button(
-                        onClick = { viewModel.resendVerificationEmail() },
-                        enabled = !uiState.isResendingVerification,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (uiState.isResendingVerification) {
-                            CircularProgressIndicator(strokeWidth = 2.dp)
-                        } else {
-                            Text("Resend verification email")
-                        }
-                    }
-
-                    TextButton(
-                        onClick = onGoToSignIn,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Go to sign in")
-                    }
                 } else {
-                    OutlinedTextField(
-                        value = uiState.email,
-                        onValueChange = viewModel::updateEmail,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Email") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    SignUpFormSection(
+                        email = uiState.email,
+                        password = uiState.password,
+                        confirmPassword = uiState.confirmPassword,
+                        errorMessage = uiState.errorMessage,
+                        isLoading = uiState.isLoading,
+                        onEmailChange = viewModel::updateEmail,
+                        onPasswordChange = viewModel::updatePassword,
+                        onConfirmPasswordChange = viewModel::updateConfirmPassword,
+                        onSignUp = viewModel::signUp,
+                        onGoToSignIn = onGoToSignIn
                     )
-
-                    OutlinedTextField(
-                        value = uiState.password,
-                        onValueChange = viewModel::updatePassword,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Password") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
-                    )
-
-                    OutlinedTextField(
-                        value = uiState.confirmPassword,
-                        onValueChange = viewModel::updateConfirmPassword,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Confirm password") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
-                    )
-
-                    uiState.errorMessage?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    Button(
-                        onClick = { viewModel.signUp() },
-                        enabled = !uiState.isLoading,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (uiState.isLoading) {
-                            CircularProgressIndicator(strokeWidth = 2.dp)
-                        } else {
-                            Text("Create Account")
-                        }
-                    }
-
-                    TextButton(
-                        onClick = onGoToSignIn,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Back to sign in")
-                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SignUpHeader(
+    didCreateAccount: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "ToneMender",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Text(
+            text = if (didCreateAccount) {
+                "Check your email"
+            } else {
+                "Create your account"
+            },
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun VerificationSentSection(
+    email: String,
+    errorMessage: String?,
+    verificationResendMessage: String?,
+    isResendingVerification: Boolean,
+    onResendVerification: () -> Unit,
+    onGoToSignIn: () -> Unit
+) {
+    Text(
+        text = "We sent a confirmation link to $email. Confirm your email to activate your account.",
+        style = MaterialTheme.typography.bodyMedium
+    )
+
+    Text(
+        text = "If you don’t see it, check your spam or junk folder.",
+        style = MaterialTheme.typography.bodySmall
+    )
+
+    errorMessage?.let {
+        ErrorText(it)
+    }
+
+    verificationResendMessage?.let {
+        Text(
+            text = it,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+
+    Button(
+        onClick = onResendVerification,
+        enabled = !isResendingVerification,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (isResendingVerification) {
+            CircularProgressIndicator(strokeWidth = 2.dp)
+        } else {
+            Text("Resend verification email")
+        }
+    }
+
+    TextButton(
+        onClick = onGoToSignIn,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text("Go to sign in")
+    }
+}
+
+@Composable
+private fun SignUpFormSection(
+    email: String,
+    password: String,
+    confirmPassword: String,
+    errorMessage: String?,
+    isLoading: Boolean,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit,
+    onSignUp: () -> Unit,
+    onGoToSignIn: () -> Unit
+) {
+    OutlinedTextField(
+        value = email,
+        onValueChange = onEmailChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text("Email") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+    )
+
+    OutlinedTextField(
+        value = password,
+        onValueChange = onPasswordChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text("Password") },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation()
+    )
+
+    OutlinedTextField(
+        value = confirmPassword,
+        onValueChange = onConfirmPasswordChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text("Confirm password") },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation()
+    )
+
+    errorMessage?.let {
+        ErrorText(it)
+    }
+
+    Button(
+        onClick = onSignUp,
+        enabled = !isLoading,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(strokeWidth = 2.dp)
+        } else {
+            Text("Create Account")
+        }
+    }
+
+    TextButton(
+        onClick = onGoToSignIn,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text("Back to sign in")
+    }
+}
+
+@Composable
+private fun ErrorText(message: String) {
+    Text(
+        text = message,
+        color = MaterialTheme.colorScheme.error
+    )
 }

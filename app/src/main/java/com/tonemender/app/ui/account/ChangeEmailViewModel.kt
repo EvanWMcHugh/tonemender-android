@@ -26,8 +26,8 @@ class ChangeEmailViewModel(
         loadCurrentEmail()
     }
 
-    fun updateNewEmail(value: String) {
-        _uiState.value = _uiState.value.copy(
+    fun updateNewEmail(value: String) = updateState {
+        copy(
             newEmail = value,
             errorMessage = null
         )
@@ -35,31 +35,41 @@ class ChangeEmailViewModel(
 
     fun loadCurrentEmail() {
         viewModelScope.launch {
-            try {
-                _uiState.value = _uiState.value.copy(
+            updateState {
+                copy(
                     isLoading = true,
                     errorMessage = null
                 )
+            }
 
-                val response = authRepository.me()
+            try {
+                val response = authRepository.getMe()
+
                 if (response.isSuccessful) {
                     val email = response.body()?.user?.email
-                    _uiState.value = _uiState.value.copy(
-                        currentEmail = email,
-                        isLoading = false,
-                        errorMessage = null
-                    )
+
+                    updateState {
+                        copy(
+                            currentEmail = email,
+                            isLoading = false,
+                            errorMessage = null
+                        )
+                    }
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = "Could not load account email."
-                    )
+                    updateState {
+                        copy(
+                            isLoading = false,
+                            errorMessage = "Could not load account email."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = e.message ?: "Network error."
-                )
+                updateState {
+                    copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "Network error."
+                    )
+                }
             }
         }
     }
@@ -69,82 +79,101 @@ class ChangeEmailViewModel(
         val newEmail = state.newEmail.trim()
         val currentEmail = state.currentEmail?.trim().orEmpty()
 
-        when {
-            newEmail.isBlank() -> {
-                _uiState.value = state.copy(
-                    errorMessage = "Enter your new email."
-                )
-                return
-            }
-
-            currentEmail.equals(newEmail, ignoreCase = true) -> {
-                _uiState.value = state.copy(
-                    errorMessage = "Enter a different email."
-                )
-                return
-            }
+        val validationError = validateInput(newEmail, currentEmail)
+        if (validationError != null) {
+            updateState { copy(errorMessage = validationError) }
+            return
         }
 
-        _uiState.value = state.copy(
-            isSubmitting = true,
-            errorMessage = null
-        )
+        updateState {
+            copy(
+                isSubmitting = true,
+                errorMessage = null
+            )
+        }
 
         viewModelScope.launch {
             try {
-                val requestHash = PlayIntegrityManager.buildRequestHash(
-                    "change_email",
-                    currentEmail,
-                    newEmail
-                )
-
-                val prepareResult = playIntegrityManager.prepare()
-                if (prepareResult.isFailure) {
-                    _uiState.value = _uiState.value.copy(
-                        isSubmitting = false,
-                        errorMessage = prepareResult.exceptionOrNull()?.message
-                            ?: "Could not prepare integrity check."
-                    )
+                val integrity = getIntegrityToken(newEmail) ?: run {
+                    updateState {
+                        copy(
+                            isSubmitting = false,
+                            errorMessage = "Could not complete integrity check."
+                        )
+                    }
                     return@launch
                 }
 
-                val tokenResult = playIntegrityManager.requestToken(requestHash)
-                val integrityToken = tokenResult.getOrElse {
-                    _uiState.value = _uiState.value.copy(
-                        isSubmitting = false,
-                        errorMessage = it.message ?: "Could not get integrity token."
-                    )
-                    return@launch
-                }
+                val (integrityToken, integrityRequestHash) = integrity
 
-                val response = authRepository.changeEmail(
+                val response = authRepository.requestEmailChange(
                     newEmail = newEmail,
                     integrityToken = integrityToken,
-                    integrityRequestHash = requestHash
+                    integrityRequestHash = integrityRequestHash
                 )
 
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(
-                        isSubmitting = false,
-                        errorMessage = null
-                    )
+                    updateState {
+                        copy(
+                            isSubmitting = false,
+                            errorMessage = null
+                        )
+                    }
+
                     UiMessageManager.showMessage(
                         "Email change requested. Check your new email for the confirmation link."
                     )
+
                     onSuccess()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isSubmitting = false,
-                        errorMessage = ApiErrorParser.parseMessage(response)
-                            ?: "Could not request email change."
-                    )
+                    updateState {
+                        copy(
+                            isSubmitting = false,
+                            errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: "Could not request email change."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isSubmitting = false,
-                    errorMessage = e.message ?: "Network error."
-                )
+                updateState {
+                    copy(
+                        isSubmitting = false,
+                        errorMessage = e.message ?: "Network error."
+                    )
+                }
             }
         }
+    }
+
+    private fun validateInput(
+        newEmail: String,
+        currentEmail: String
+    ): String? {
+        return when {
+            newEmail.isBlank() -> "Enter your new email."
+            newEmail.equals(currentEmail, ignoreCase = true) -> "Enter a different email."
+            else -> null
+        }
+    }
+
+    private suspend fun getIntegrityToken(
+        email: String
+    ): Pair<String, String>? {
+        val requestHash = PlayIntegrityManager.buildRequestHash(
+            "change_email",
+            email
+        )
+
+        val prepareResult = playIntegrityManager.prepare()
+        if (prepareResult.isFailure) return null
+
+        val tokenResult = playIntegrityManager.requestToken(requestHash)
+        val token = tokenResult.getOrElse { return null }
+
+        return token to requestHash
+    }
+
+    private inline fun updateState(transform: ChangeEmailUiState.() -> ChangeEmailUiState) {
+        _uiState.value = _uiState.value.transform()
     }
 }

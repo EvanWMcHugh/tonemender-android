@@ -28,8 +28,8 @@ class ForgotPasswordViewModel(
     )
     val uiState: StateFlow<ForgotPasswordUiState> = _uiState.asStateFlow()
 
-    fun updateEmail(value: String) {
-        _uiState.value = _uiState.value.copy(
+    fun updateEmail(value: String) = updateState {
+        copy(
             email = value,
             errorMessage = null
         )
@@ -39,69 +39,106 @@ class ForgotPasswordViewModel(
         val email = _uiState.value.email.trim()
 
         if (email.isBlank()) {
-            _uiState.value = _uiState.value.copy(
-                errorMessage = "Enter your email."
-            )
+            updateState {
+                copy(errorMessage = "Enter your email.")
+            }
             return
         }
 
-        _uiState.value = _uiState.value.copy(
-            isLoading = true,
-            errorMessage = null
-        )
+        updateState {
+            copy(
+                isLoading = true,
+                errorMessage = null
+            )
+        }
 
         viewModelScope.launch {
             try {
-                val requestHash = PlayIntegrityManager.buildRequestHash(
-                    "forgot_password",
+                val integrity = getIntegrityToken(
+                    action = "forgot_password",
                     email
-                )
+                ) ?: return@launch
 
-                val prepareResult = playIntegrityManager.prepare()
-                if (prepareResult.isFailure) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = prepareResult.exceptionOrNull()?.message
-                            ?: "Could not prepare integrity check."
-                    )
-                    return@launch
-                }
-
-                val tokenResult = playIntegrityManager.requestToken(requestHash)
-                val integrityToken = tokenResult.getOrElse {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = it.message ?: "Could not get integrity token."
-                    )
-                    return@launch
-                }
-
-                val response = authRepository.forgotPassword(
+                val response = authRepository.requestPasswordReset(
                     email = email,
-                    integrityToken = integrityToken,
-                    integrityRequestHash = requestHash
+                    integrityToken = integrity.token,
+                    integrityRequestHash = integrity.requestHash
                 )
 
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = null
+                    updateState {
+                        copy(
+                            isLoading = false,
+                            errorMessage = null
+                        )
+                    }
+
+                    UiMessageManager.showMessage(
+                        "If that email exists, a reset link has been sent."
                     )
-                    UiMessageManager.showMessage("If that email exists, a reset link has been sent.")
+
                     onSuccess()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = ApiErrorParser.parseMessage(response)
-                            ?: "Could not send reset email."
-                    )
+                    updateState {
+                        copy(
+                            isLoading = false,
+                            errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: "Could not send reset email."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = e.message ?: "Network error."
-                )
+                updateState {
+                    copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "Network error."
+                    )
+                }
             }
         }
     }
+
+    private suspend fun getIntegrityToken(
+        action: String,
+        vararg inputs: String
+    ): IntegrityResult? {
+        val requestHash = PlayIntegrityManager.buildRequestHash(action, *inputs)
+
+        val prepareResult = playIntegrityManager.prepare()
+        if (prepareResult.isFailure) {
+            updateState {
+                copy(
+                    isLoading = false,
+                    errorMessage = prepareResult.exceptionOrNull()?.message
+                        ?: "Could not prepare integrity check."
+                )
+            }
+            return null
+        }
+
+        val tokenResult = playIntegrityManager.requestToken(requestHash)
+        val token = tokenResult.getOrElse {
+            updateState {
+                copy(
+                    isLoading = false,
+                    errorMessage = it.message ?: "Could not get integrity token."
+                )
+            }
+            return null
+        }
+
+        return IntegrityResult(
+            token = token,
+            requestHash = requestHash
+        )
+    }
+
+    private inline fun updateState(transform: ForgotPasswordUiState.() -> ForgotPasswordUiState) {
+        _uiState.value = _uiState.value.transform()
+    }
+
+    private data class IntegrityResult(
+        val token: String,
+        val requestHash: String
+    )
 }

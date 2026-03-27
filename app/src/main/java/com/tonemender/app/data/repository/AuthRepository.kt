@@ -21,15 +21,15 @@ class AuthRepository {
         integrityRequestHash: String? = null,
         deviceName: String? = null
     ): Response<MeResponse> {
-        return NetworkModule.api.signIn(
-            SignInRequest(
-                email = email,
-                password = password,
-                integrityToken = integrityToken,
-                integrityRequestHash = integrityRequestHash,
-                deviceName = deviceName
-            )
+        val request = SignInRequest(
+            email = email,
+            password = password,
+            integrityToken = integrityToken,
+            integrityRequestHash = integrityRequestHash,
+            deviceName = deviceName
         )
+
+        return NetworkModule.api.signIn(request)
     }
 
     suspend fun signUp(
@@ -38,28 +38,28 @@ class AuthRepository {
         integrityToken: String? = null,
         integrityRequestHash: String? = null
     ): Response<GenericMessageResponse> {
-        return NetworkModule.api.signUp(
-            SignUpRequest(
-                email = email,
-                password = password,
-                integrityToken = integrityToken,
-                integrityRequestHash = integrityRequestHash
-            )
+        val request = SignUpRequest(
+            email = email,
+            password = password,
+            integrityToken = integrityToken,
+            integrityRequestHash = integrityRequestHash
         )
+
+        return NetworkModule.api.signUp(request)
     }
 
-    suspend fun forgotPassword(
+    suspend fun requestPasswordReset(
         email: String,
         integrityToken: String? = null,
         integrityRequestHash: String? = null
     ): Response<GenericMessageResponse> {
-        return NetworkModule.api.forgotPassword(
-            ForgotPasswordRequest(
-                email = email,
-                integrityToken = integrityToken,
-                integrityRequestHash = integrityRequestHash
-            )
+        val request = ForgotPasswordRequest(
+            email = email,
+            integrityToken = integrityToken,
+            integrityRequestHash = integrityRequestHash
         )
+
+        return NetworkModule.api.requestPasswordReset(request)
     }
 
     suspend fun resendEmailVerification(
@@ -67,39 +67,39 @@ class AuthRepository {
         integrityToken: String? = null,
         integrityRequestHash: String? = null
     ): Response<GenericMessageResponse> {
-        return NetworkModule.api.resendEmailVerification(
-            ResendEmailVerificationRequest(
-                email = email,
-                integrityToken = integrityToken,
-                integrityRequestHash = integrityRequestHash
-            )
+        val request = ResendEmailVerificationRequest(
+            email = email,
+            integrityToken = integrityToken,
+            integrityRequestHash = integrityRequestHash
         )
+
+        return NetworkModule.api.resendEmailVerification(request)
     }
 
-    suspend fun changeEmail(
+    suspend fun requestEmailChange(
         newEmail: String,
         integrityToken: String? = null,
         integrityRequestHash: String? = null
     ): Response<GenericMessageResponse> {
-        return NetworkModule.api.changeEmail(
-            ChangeEmailRequest(
-                newEmail = newEmail,
-                integrityToken = integrityToken,
-                integrityRequestHash = integrityRequestHash
-            )
+        val request = ChangeEmailRequest(
+            newEmail = newEmail,
+            integrityToken = integrityToken,
+            integrityRequestHash = integrityRequestHash
         )
+
+        return NetworkModule.api.requestEmailChange(request)
     }
 
     suspend fun deleteAccount(
         integrityToken: String? = null,
         integrityRequestHash: String? = null
     ): Response<GenericMessageResponse> {
-        return NetworkModule.api.deleteAccount(
-            DeleteAccountRequest(
-                integrityToken = integrityToken,
-                integrityRequestHash = integrityRequestHash
-            )
+        val request = DeleteAccountRequest(
+            integrityToken = integrityToken,
+            integrityRequestHash = integrityRequestHash
         )
+
+        return NetworkModule.api.deleteAccount(request)
     }
 
     suspend fun verifyGooglePlayPurchase(
@@ -107,18 +107,22 @@ class AuthRepository {
         productId: String,
         basePlanId: String
     ): Response<GenericMessageResponse> {
-        return NetworkModule.api.verifyGooglePlayPurchase(
-            GooglePlayVerifyRequest(
-                purchaseToken = purchaseToken,
-                productId = productId,
-                basePlanId = basePlanId
-            )
+        val request = GooglePlayVerifyRequest(
+            purchaseToken = purchaseToken,
+            productId = productId,
+            basePlanId = basePlanId
         )
+
+        return NetworkModule.api.verifyGooglePlayPurchase(request)
     }
 
-    suspend fun me() = NetworkModule.api.me()
+    suspend fun getMe(): Response<MeResponse> {
+        return NetworkModule.api.getMe()
+    }
 
-    suspend fun signOut() = NetworkModule.api.signOut()
+    suspend fun signOut(): Response<GenericMessageResponse> {
+        return NetworkModule.api.signOut()
+    }
 
     fun clearSession() {
         NetworkModule.clearSessionCookies()

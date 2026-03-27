@@ -66,75 +66,25 @@ fun AccountScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = "Account",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Text(
-                text = "View your plan and usage",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+        AccountHeader()
 
         if (uiState.loading) {
-            CircularProgressIndicator()
+            LoadingSection()
         } else {
             uiState.error?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error
-                )
+                ErrorText(it)
             }
 
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Email",
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Text(
-                        text = uiState.email ?: "Unknown",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+            AccountInfoCard(
+                email = uiState.email,
+                isPro = uiState.isPro,
+                planType = uiState.planType
+            )
 
-                    Text(
-                        text = "Plan",
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Text(
-                        text = if (uiState.isPro) {
-                            uiState.planType ?: "Pro"
-                        } else {
-                            "Free"
-                        },
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-            }
-
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Usage",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Text("Rewrites today: ${uiState.rewritesToday}")
-                    Text("Total rewrites: ${uiState.totalRewrites}")
-                }
-            }
+            UsageCard(
+                rewritesToday = uiState.rewritesToday,
+                totalRewrites = uiState.totalRewrites
+            )
 
             OutlinedButton(
                 onClick = onGoToChangeEmail,
@@ -175,6 +125,97 @@ fun AccountScreen(
             ) {
                 Text("Back")
             }
+        }
+    }
+}
+
+@Composable
+private fun AccountHeader() {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = "Account",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Text(
+            text = "View your plan and usage",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun LoadingSection() {
+    CircularProgressIndicator()
+}
+
+@Composable
+private fun ErrorText(message: String) {
+    Text(
+        text = message,
+        color = MaterialTheme.colorScheme.error
+    )
+}
+
+@Composable
+private fun AccountInfoCard(
+    email: String?,
+    isPro: Boolean,
+    planType: String?
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Email",
+                style = MaterialTheme.typography.labelMedium
+            )
+            Text(
+                text = email ?: "Unknown",
+                style = MaterialTheme.typography.bodyLarge
+            )
+
+            Text(
+                text = "Plan",
+                style = MaterialTheme.typography.labelMedium
+            )
+            Text(
+                text = if (isPro) {
+                    planType ?: "Pro"
+                } else {
+                    "Free"
+                },
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+    }
+}
+
+@Composable
+private fun UsageCard(
+    rewritesToday: Int,
+    totalRewrites: Int
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Usage",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text("Rewrites today: $rewritesToday")
+            Text("Total rewrites: $totalRewrites")
         }
     }
 }

@@ -4,6 +4,7 @@ import com.tonemender.app.data.remote.NetworkModule
 import com.tonemender.app.data.remote.model.CreateDraftRequest
 import com.tonemender.app.data.remote.model.DraftResponse
 import com.tonemender.app.data.remote.model.DraftsResponse
+import com.tonemender.app.data.remote.model.GenericMessageResponse
 import com.tonemender.app.data.remote.model.RewriteRequest
 import com.tonemender.app.data.remote.model.RewriteResponse
 import com.tonemender.app.data.remote.model.UpdateDraftRequest
@@ -14,16 +15,16 @@ class RewriteRepository {
 
     suspend fun rewrite(
         message: String,
-        recipient: String?,
-        tone: String?
+        recipient: String? = null,
+        tone: String? = null
     ): Response<RewriteResponse> {
-        return NetworkModule.api.rewrite(
-            RewriteRequest(
-                message = message,
-                recipient = recipient,
-                tone = tone
-            )
+        val request = RewriteRequest(
+            message = message,
+            recipient = recipient,
+            tone = tone
         )
+
+        return NetworkModule.api.rewrite(request)
     }
 
     suspend fun getUsageStats(): Response<UsageStatsResponse> {
@@ -37,36 +38,40 @@ class RewriteRepository {
     suspend fun createDraft(
         originalMessage: String,
         rewrittenMessage: String,
-        recipient: String?,
-        tone: String?
+        recipient: String? = null,
+        tone: String? = null
     ): Response<DraftResponse> {
-        return NetworkModule.api.createDraft(
-            CreateDraftRequest(
-                message = originalMessage,
-                rewrittenMessage = rewrittenMessage,
-                recipient = recipient,
-                tone = tone
-            )
+        val request = CreateDraftRequest(
+            message = originalMessage,
+            rewrittenMessage = rewrittenMessage,
+            recipient = recipient,
+            tone = tone
         )
+
+        return NetworkModule.api.createDraft(request)
     }
 
     suspend fun updateDraft(
         draftId: String,
         originalMessage: String,
         rewrittenMessage: String,
-        recipient: String?,
-        tone: String?
+        recipient: String? = null,
+        tone: String? = null
     ): Response<DraftResponse> {
+        val request = UpdateDraftRequest(
+            message = originalMessage,
+            rewrittenMessage = rewrittenMessage,
+            recipient = recipient,
+            tone = tone
+        )
+
         return NetworkModule.api.updateDraft(
             draftId = draftId,
-            body = UpdateDraftRequest(
-                message = originalMessage,
-                rewrittenMessage = rewrittenMessage,
-                recipient = recipient,
-                tone = tone
-            )
+            request = request
         )
     }
 
-    suspend fun deleteDraft(draftId: String) = NetworkModule.api.deleteDraft(draftId)
+    suspend fun deleteDraft(draftId: String): Response<GenericMessageResponse> {
+        return NetworkModule.api.deleteDraft(draftId)
+    }
 }

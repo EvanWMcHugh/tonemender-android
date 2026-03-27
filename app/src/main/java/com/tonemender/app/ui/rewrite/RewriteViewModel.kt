@@ -27,31 +27,24 @@ class RewriteViewModel(
     val uiState: StateFlow<RewriteUiState> = _uiState.asStateFlow()
 
     init {
-        loadUser()
-        loadUsage()
+        refreshUser()
+        refreshUsage()
     }
 
-    fun refreshUsage() {
-        loadUsage()
-    }
+    fun refreshUsage() = loadUsage()
+    fun refreshUser() = loadUser()
 
-    fun refreshUser() {
-        loadUser()
-    }
+    /* ---------- Loaders ---------- */
 
     private fun loadUser() {
         viewModelScope.launch {
             try {
-                val response = authRepository.me()
-
+                val response = authRepository.getMe()
                 if (response.isSuccessful) {
-                    val user = response.body()?.user
-                    _uiState.value = _uiState.value.copy(
-                        isPro = user?.isPro == true
-                    )
+                    val isPro = response.body()?.user?.isPro == true
+                    updateState { copy(isPro = isPro) }
                 }
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) {}
         }
     }
 
@@ -61,158 +54,140 @@ class RewriteViewModel(
                 val response = rewriteRepository.getUsageStats()
                 if (response.isSuccessful) {
                     val stats = response.body()?.stats
-                    _uiState.value = _uiState.value.copy(
-                        usageToday = stats?.today ?: _uiState.value.usageToday,
-                        usageTotal = stats?.total ?: _uiState.value.usageTotal
-                    )
+                    updateState {
+                        copy(
+                            usageToday = stats?.today ?: usageToday,
+                            usageTotal = stats?.total ?: usageTotal
+                        )
+                    }
                 }
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) {}
         }
     }
+
+    /* ---------- Input ---------- */
 
     fun updateMessage(value: String) {
-        val trimmedToLimit = value.take(MAX_MESSAGE_CHARS)
-        val state = _uiState.value
-
-        _uiState.value = state.copy(
-            message = trimmedToLimit,
-            errorMessage = null
-        )
-    }
-
-    fun updateTone(value: String?) {
-        _uiState.value = _uiState.value.copy(
-            selectedTone = value,
-            errorMessage = null
-        )
-    }
-
-    fun updateRecipient(value: String?) {
-        _uiState.value = _uiState.value.copy(
-            selectedRecipient = value,
-            errorMessage = null
-        )
-    }
-
-    fun rewrite() {
-        val currentState = _uiState.value
-        val message = currentState.message.trim()
-
-        if (message.isBlank()) {
-            _uiState.value = currentState.copy(
-                errorMessage = "Enter a message to rewrite."
-            )
-            return
-        }
-
-        _uiState.value = currentState.copy(
-            isLoading = true,
-            errorMessage = null
-        )
-
-        viewModelScope.launch {
-            try {
-                val recipientToSend =
-                    if (_uiState.value.isPro) _uiState.value.selectedRecipient else null
-
-                val toneToSend =
-                    if (_uiState.value.isPro) _uiState.value.selectedTone else null
-
-                val response = rewriteRepository.rewrite(
-                    message = message,
-                    recipient = recipientToSend,
-                    tone = toneToSend
-                )
-
-                if (response.isSuccessful) {
-                    val body = response.body()
-
-                    val chosenRewrite = when {
-                        !_uiState.value.isPro -> body?.clear?.trim()
-                        _uiState.value.selectedTone == "soft" -> body?.soft?.trim()
-                        _uiState.value.selectedTone == "calm" -> body?.calm?.trim()
-                        else -> body?.clear?.trim()
-                    }
-
-                    if (!chosenRewrite.isNullOrBlank()) {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            rewrittenMessage = chosenRewrite,
-                            originalMessageSnapshot = message,
-                            errorMessage = null,
-                            toneScore = body?.toneScore,
-                            emotionalImpact = body?.emotionalImpact,
-                            usageToday = body?.usageToday ?: _uiState.value.usageToday,
-                            usageTotal = body?.usageTotal ?: _uiState.value.usageTotal
-                        )
-
-                        loadUsage()
-                    } else {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            errorMessage = body?.error
-                                ?: body?.message
-                                ?: "Rewrite failed."
-                        )
-                    }
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = ApiErrorParser.parseMessage(response)
-                            ?: "Rewrite failed (${response.code()})."
-                    )
-                }
-            } catch (e: Exception) {
-                if (BuildConfig.DEBUG) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        rewrittenMessage = buildMockRewrite(
-                            original = message,
-                            tone = if (_uiState.value.isPro) _uiState.value.selectedTone else null,
-                            recipient = if (_uiState.value.isPro) _uiState.value.selectedRecipient else null
-                        ),
-                        originalMessageSnapshot = message,
-                        errorMessage = null,
-                        toneScore = 82,
-                        emotionalImpact = "Comes across more clear and less reactive."
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = e.message ?: "Network error."
-                    )
-                }
-            }
-        }
-    }
-
-    fun revertToOriginalMessage() {
-        val snapshot = _uiState.value.originalMessageSnapshot
-        if (!snapshot.isNullOrBlank()) {
-            _uiState.value = _uiState.value.copy(
-                message = snapshot,
+        updateState {
+            copy(
+                message = value.take(MAX_MESSAGE_CHARS),
                 errorMessage = null
             )
         }
     }
 
-    fun useRewriteAsOriginal() {
-        val rewritten = _uiState.value.rewrittenMessage.trim()
-        if (rewritten.isBlank()) return
-
-        _uiState.value = _uiState.value.copy(
-            message = rewritten,
-            errorMessage = null
-        )
+    fun updateTone(value: String?) {
+        updateState { copy(selectedTone = value, errorMessage = null) }
     }
 
-    fun clearOriginalMessage() {
-        _uiState.value = _uiState.value.copy(
-            message = "",
-            errorMessage = null
-        )
+    fun updateRecipient(value: String?) {
+        updateState { copy(selectedRecipient = value, errorMessage = null) }
     }
+
+    /* ---------- Rewrite ---------- */
+
+    fun rewrite() {
+        val state = _uiState.value
+        val message = state.message.trim()
+
+        if (message.isBlank()) {
+            updateState { copy(errorMessage = "Enter a message to rewrite.") }
+            return
+        }
+
+        updateState { copy(isLoading = true, errorMessage = null) }
+
+        viewModelScope.launch {
+            try {
+                val response = rewriteRepository.rewrite(
+                    message = message,
+                    recipient = state.selectedRecipient.takeIf { state.isPro },
+                    tone = state.selectedTone.takeIf { state.isPro }
+                )
+
+                if (response.isSuccessful) {
+                    handleRewriteSuccess(message, response.body())
+                } else {
+                    updateState {
+                        copy(
+                            isLoading = false,
+                            errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: "Rewrite failed (${response.code()})."
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                handleRewriteException(message, e)
+            }
+        }
+    }
+
+    private fun handleRewriteSuccess(
+        originalMessage: String,
+        body: com.tonemender.app.data.remote.model.RewriteResponse?
+    ) {
+        val state = _uiState.value
+
+        val chosenRewrite = when {
+            !state.isPro -> body?.clear?.trim()
+            state.selectedTone == "soft" -> body?.soft?.trim()
+            state.selectedTone == "calm" -> body?.calm?.trim()
+            else -> body?.clear?.trim()
+        }
+
+        if (chosenRewrite.isNullOrBlank()) {
+            updateState {
+                copy(
+                    isLoading = false,
+                    errorMessage = body?.error ?: body?.message ?: "Rewrite failed."
+                )
+            }
+            return
+        }
+
+        updateState {
+            copy(
+                isLoading = false,
+                rewrittenMessage = chosenRewrite,
+                originalMessageSnapshot = originalMessage,
+                errorMessage = null,
+                toneScore = body?.toneScore,
+                emotionalImpact = body?.emotionalImpact,
+                usageToday = body?.usageToday ?: usageToday,
+                usageTotal = body?.usageTotal ?: usageTotal
+            )
+        }
+
+        loadUsage()
+    }
+
+    private fun handleRewriteException(message: String, e: Exception) {
+        if (BuildConfig.DEBUG) {
+            updateState {
+                copy(
+                    isLoading = false,
+                    rewrittenMessage = buildMockRewrite(
+                        original = message,
+                        tone = selectedTone,
+                        recipient = selectedRecipient
+                    ),
+                    originalMessageSnapshot = message,
+                    errorMessage = null,
+                    toneScore = 82,
+                    emotionalImpact = "Comes across more clear and less reactive."
+                )
+            }
+        } else {
+            updateState {
+                copy(
+                    isLoading = false,
+                    errorMessage = e.message ?: "Network error."
+                )
+            }
+        }
+    }
+
+    /* ---------- Drafts ---------- */
 
     fun saveDraft() {
         val state = _uiState.value
@@ -220,9 +195,9 @@ class RewriteViewModel(
         val rewritten = state.rewrittenMessage.trim()
 
         if (original.isBlank() || rewritten.isBlank()) {
-            _uiState.value = state.copy(
-                errorMessage = "Generate a rewrite before saving a draft."
-            )
+            updateState {
+                copy(errorMessage = "Generate a rewrite before saving a draft.")
+            }
             return
         }
 
@@ -233,55 +208,77 @@ class RewriteViewModel(
                         draftId = state.editingDraftId,
                         originalMessage = original,
                         rewrittenMessage = rewritten,
-                        recipient = if (state.isPro) state.selectedRecipient else null,
-                        tone = if (state.isPro) state.selectedTone else null
+                        recipient = state.selectedRecipient.takeIf { state.isPro },
+                        tone = state.selectedTone.takeIf { state.isPro }
                     )
                 } else {
                     rewriteRepository.createDraft(
                         originalMessage = original,
                         rewrittenMessage = rewritten,
-                        recipient = if (state.isPro) state.selectedRecipient else null,
-                        tone = if (state.isPro) state.selectedTone else null
+                        recipient = state.selectedRecipient.takeIf { state.isPro },
+                        tone = state.selectedTone.takeIf { state.isPro }
                     )
                 }
 
                 if (response.isSuccessful) {
-                    val returnedDraft = response.body()?.draft
-
-                    _uiState.value = _uiState.value.copy(
-                        editingDraftId = returnedDraft?.id ?: state.editingDraftId,
-                        errorMessage = null
-                    )
+                    val returnedId = response.body()?.draft?.id
+                    updateState {
+                        copy(editingDraftId = returnedId ?: editingDraftId)
+                    }
 
                     UiMessageManager.showMessage(
                         if (state.editingDraftId != null) "Draft updated." else "Draft saved."
                     )
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = ApiErrorParser.parseMessage(response) ?: "Failed to save draft."
-                    )
+                    updateState {
+                        copy(
+                            errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: "Failed to save draft."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = e.message ?: "Failed to save draft."
-                )
+                updateState {
+                    copy(errorMessage = e.message ?: "Failed to save draft.")
+                }
             }
         }
     }
 
     fun loadDraft(draft: Draft) {
-        _uiState.value = _uiState.value.copy(
-            message = draft.originalMessage,
-            rewrittenMessage = draft.rewrittenMessage,
-            selectedRecipient = draft.recipient,
-            selectedTone = draft.tone,
-            errorMessage = null,
-            isLoading = false,
-            editingDraftId = draft.id,
-            originalMessageSnapshot = draft.originalMessage,
-            toneScore = null,
-            emotionalImpact = null
-        )
+        updateState {
+            copy(
+                message = draft.originalMessage,
+                rewrittenMessage = draft.rewrittenMessage,
+                selectedRecipient = draft.recipient,
+                selectedTone = draft.tone,
+                editingDraftId = draft.id,
+                originalMessageSnapshot = draft.originalMessage,
+                isLoading = false,
+                errorMessage = null,
+                toneScore = null,
+                emotionalImpact = null
+            )
+        }
+    }
+
+    /* ---------- Actions ---------- */
+
+    fun revertToOriginalMessage() {
+        _uiState.value.originalMessageSnapshot?.let {
+            updateState { copy(message = it, errorMessage = null) }
+        }
+    }
+
+    fun useRewriteAsOriginal() {
+        val rewritten = _uiState.value.rewrittenMessage.trim()
+        if (rewritten.isNotBlank()) {
+            updateState { copy(message = rewritten, errorMessage = null) }
+        }
+    }
+
+    fun clearOriginalMessage() {
+        updateState { copy(message = "", errorMessage = null) }
     }
 
     fun copyRewriteToClipboard() {
@@ -292,8 +289,10 @@ class RewriteViewModel(
         UiMessageManager.showMessage("Opening share sheet…")
     }
 
-    fun shareBeforeAfter() {
-        UiMessageManager.showMessage("Opening before/after share sheet…")
+    /* ---------- Helpers ---------- */
+
+    private inline fun updateState(transform: RewriteUiState.() -> RewriteUiState) {
+        _uiState.value = _uiState.value.transform()
     }
 
     private fun buildMockRewrite(

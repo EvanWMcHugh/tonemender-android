@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -44,76 +44,114 @@ fun ChangeEmailScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = "Change Email",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Text(
-                text = "Request an email change for your account.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+        ChangeEmailHeader()
 
         if (uiState.isLoading) {
-            CircularProgressIndicator()
+            LoadingSection()
         } else {
-            ElevatedCard(
+            ChangeEmailForm(
+                currentEmail = uiState.currentEmail,
+                newEmail = uiState.newEmail,
+                errorMessage = uiState.errorMessage,
+                isSubmitting = uiState.isSubmitting,
+                onNewEmailChange = viewModel::updateNewEmail,
+                onSubmit = {
+                    viewModel.submit(onSuccess = onBack)
+                },
+                onBack = onBack
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChangeEmailHeader() {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = "Change Email",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Text(
+            text = "Request an email change for your account.",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun LoadingSection() {
+    CircularProgressIndicator()
+}
+
+@Composable
+private fun ChangeEmailForm(
+    currentEmail: String?,
+    newEmail: String,
+    errorMessage: String?,
+    isSubmitting: Boolean,
+    onNewEmailChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onBack: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Current email",
+                style = MaterialTheme.typography.labelMedium
+            )
+
+            Text(
+                text = currentEmail ?: "Unknown",
+                style = MaterialTheme.typography.bodyLarge
+            )
+
+            OutlinedTextField(
+                value = newEmail,
+                onValueChange = onNewEmailChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("New email") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
+
+            errorMessage?.let {
+                ErrorText(it)
+            }
+
+            Button(
+                onClick = onSubmit,
+                enabled = !isSubmitting,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Current email",
-                        style = MaterialTheme.typography.labelMedium
-                    )
-
-                    Text(
-                        text = uiState.currentEmail ?: "Unknown",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-
-                    OutlinedTextField(
-                        value = uiState.newEmail,
-                        onValueChange = viewModel::updateNewEmail,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("New email") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                    )
-
-                    uiState.errorMessage?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    Button(
-                        onClick = {
-                            viewModel.submit(onSuccess = onBack)
-                        },
-                        enabled = !uiState.isSubmitting,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (uiState.isSubmitting) {
-                            CircularProgressIndicator(strokeWidth = 2.dp)
-                        } else {
-                            Text("Request Email Change")
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = onBack,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Back")
-                    }
+                if (isSubmitting) {
+                    CircularProgressIndicator(strokeWidth = 2.dp)
+                } else {
+                    Text("Request Email Change")
                 }
+            }
+
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Back")
             }
         }
     }
+}
+
+@Composable
+private fun ErrorText(message: String) {
+    Text(
+        text = message,
+        color = MaterialTheme.colorScheme.error
+    )
 }

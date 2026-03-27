@@ -38,128 +38,29 @@ fun UpgradeScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = uiState.title,
-                style = MaterialTheme.typography.headlineMedium
-            )
+        UpgradeHeader(
+            title = uiState.title,
+            description = uiState.description
+        )
 
-            Text(
-                text = uiState.description,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+        PlanSelectionCard(
+            uiState = uiState,
+            onSelectPlan = viewModel::selectPlan
+        )
 
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = uiState.productName,
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Text(
-                    text = "Choose a plan",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                if (uiState.isLoading && !uiState.hasPlans) {
-                    CircularProgressIndicator()
-                } else {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        if (uiState.monthlyPriceLabel.isNotBlank()) {
-                            FilterChip(
-                                selected = uiState.selectedPlan == UpgradePlan.MONTHLY,
-                                onClick = { viewModel.selectPlan(UpgradePlan.MONTHLY) },
-                                label = { Text("Monthly • ${uiState.monthlyPriceLabel}") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
-                        if (uiState.yearlyPriceLabel.isNotBlank()) {
-                            FilterChip(
-                                selected = uiState.selectedPlan == UpgradePlan.YEARLY,
-                                onClick = { viewModel.selectPlan(UpgradePlan.YEARLY) },
-                                label = { Text("Yearly • ${uiState.yearlyPriceLabel}") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "What you unlock",
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Text(
-                    text = "• Unlimited rewrites",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Text(
-                    text = "• Tone selection",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Text(
-                    text = "• Recipient targeting",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Text(
-                    text = "• Premium rewrite experience",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
+        UpgradeFeaturesCard()
 
         uiState.errorMessage?.let {
-            Text(
-                text = it,
-                color = MaterialTheme.colorScheme.error
-            )
+            ErrorText(it)
         }
 
-        Button(
-            onClick = {
-                if (activity != null) {
-                    viewModel.startPurchase(activity)
-                }
-            },
-            enabled = activity != null && uiState.hasPlans && !uiState.isLoading && !uiState.isPurchasing,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            if (uiState.isPurchasing) {
-                CircularProgressIndicator(strokeWidth = 2.dp)
-            } else {
-                val selectedPrice = when (uiState.selectedPlan) {
-                    UpgradePlan.MONTHLY -> uiState.monthlyPriceLabel
-                    UpgradePlan.YEARLY -> uiState.yearlyPriceLabel
-                }
-
-                if (selectedPrice.isNotBlank()) {
-                    Text("Continue with $selectedPrice")
-                } else {
-                    Text("Continue")
-                }
+        PurchaseButton(
+            uiState = uiState,
+            activity = activity,
+            onStartPurchase = { safeActivity ->
+                viewModel.startPurchase(safeActivity)
             }
-        }
+        )
 
         OutlinedButton(
             onClick = viewModel::refreshPlans,
@@ -175,5 +76,160 @@ fun UpgradeScreen(
         ) {
             Text("Back")
         }
+    }
+}
+
+@Composable
+private fun UpgradeHeader(
+    title: String,
+    description: String
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun PlanSelectionCard(
+    uiState: UpgradeUiState,
+    onSelectPlan: (UpgradePlan) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = uiState.productName,
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = "Choose a plan",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            if (uiState.isLoading && !uiState.hasPlans) {
+                CircularProgressIndicator()
+            } else {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (uiState.monthlyPriceLabel.isNotBlank()) {
+                        FilterChip(
+                            selected = uiState.selectedPlan == UpgradePlan.MONTHLY,
+                            onClick = { onSelectPlan(UpgradePlan.MONTHLY) },
+                            label = { Text("Monthly • ${uiState.monthlyPriceLabel}") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    if (uiState.yearlyPriceLabel.isNotBlank()) {
+                        FilterChip(
+                            selected = uiState.selectedPlan == UpgradePlan.YEARLY,
+                            onClick = { onSelectPlan(UpgradePlan.YEARLY) },
+                            label = { Text("Yearly • ${uiState.yearlyPriceLabel}") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpgradeFeaturesCard() {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "What you unlock",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = "• Unlimited rewrites",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Text(
+                text = "• Tone selection",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Text(
+                text = "• Recipient targeting",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Text(
+                text = "• Premium rewrite experience",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun PurchaseButton(
+    uiState: UpgradeUiState,
+    activity: Activity?,
+    onStartPurchase: (Activity) -> Unit
+) {
+    val enabled = activity != null &&
+            uiState.hasPlans &&
+            !uiState.isLoading &&
+            !uiState.isPurchasing
+
+    Button(
+        onClick = {
+            activity?.let(onStartPurchase)
+        },
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (uiState.isPurchasing) {
+            CircularProgressIndicator(strokeWidth = 2.dp)
+        } else {
+            Text(buildPurchaseButtonLabel(uiState))
+        }
+    }
+}
+
+@Composable
+private fun ErrorText(message: String) {
+    Text(
+        text = message,
+        color = MaterialTheme.colorScheme.error
+    )
+}
+
+private fun buildPurchaseButtonLabel(uiState: UpgradeUiState): String {
+    val selectedPrice = when (uiState.selectedPlan) {
+        UpgradePlan.MONTHLY -> uiState.monthlyPriceLabel
+        UpgradePlan.YEARLY -> uiState.yearlyPriceLabel
+    }
+
+    return if (selectedPrice.isNotBlank()) {
+        "Continue with $selectedPrice"
+    } else {
+        "Continue"
     }
 }

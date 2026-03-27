@@ -21,6 +21,8 @@ class DraftsViewModel(
     private val _uiState = MutableStateFlow(DraftsUiState())
     val uiState: StateFlow<DraftsUiState> = _uiState.asStateFlow()
 
+    /* ---------- Load ---------- */
+
     fun loadDrafts() {
         viewModelScope.launch {
             try {
@@ -33,19 +35,24 @@ class DraftsViewModel(
                         .map { it.toDraft() }
                         .sortedByDescending { it.createdAt }
 
-                    _uiState.value = _uiState.value.copy(
-                        drafts = drafts,
-                        errorMessage = null
-                    )
+                    updateState {
+                        copy(
+                            drafts = drafts,
+                            errorMessage = null
+                        )
+                    }
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = ApiErrorParser.parseMessage(response) ?: "Failed to load drafts."
-                    )
+                    updateState {
+                        copy(
+                            errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: "Failed to load drafts."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = e.message ?: "Failed to load drafts."
-                )
+                updateState {
+                    copy(errorMessage = e.message ?: "Failed to load drafts.")
+                }
             }
         }
     }
@@ -54,16 +61,14 @@ class DraftsViewModel(
         onOpened(draft)
     }
 
+    /* ---------- Delete single ---------- */
+
     fun requestDeleteDraft(draft: Draft) {
-        _uiState.value = _uiState.value.copy(
-            pendingDeleteDraft = draft
-        )
+        updateState { copy(pendingDeleteDraft = draft) }
     }
 
     fun cancelDeleteDraft() {
-        _uiState.value = _uiState.value.copy(
-            pendingDeleteDraft = null
-        )
+        updateState { copy(pendingDeleteDraft = null) }
     }
 
     fun confirmDeleteDraft() {
@@ -74,37 +79,43 @@ class DraftsViewModel(
                 val response = rewriteRepository.deleteDraft(draft.id)
 
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(
-                        drafts = _uiState.value.drafts.filterNot { it.id == draft.id },
-                        pendingDeleteDraft = null,
-                        errorMessage = null
-                    )
+                    updateState {
+                        copy(
+                            drafts = drafts.filterNot { it.id == draft.id },
+                            pendingDeleteDraft = null,
+                            errorMessage = null
+                        )
+                    }
+
                     UiMessageManager.showMessage("Draft deleted.")
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        pendingDeleteDraft = null,
-                        errorMessage = ApiErrorParser.parseMessage(response) ?: "Failed to delete draft."
-                    )
+                    updateState {
+                        copy(
+                            pendingDeleteDraft = null,
+                            errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: "Failed to delete draft."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    pendingDeleteDraft = null,
-                    errorMessage = e.message ?: "Failed to delete draft."
-                )
+                updateState {
+                    copy(
+                        pendingDeleteDraft = null,
+                        errorMessage = e.message ?: "Failed to delete draft."
+                    )
+                }
             }
         }
     }
 
+    /* ---------- Clear all ---------- */
+
     fun requestClearAllDrafts() {
-        _uiState.value = _uiState.value.copy(
-            showClearAllDialog = true
-        )
+        updateState { copy(showClearAllDialog = true) }
     }
 
     fun cancelClearAllDrafts() {
-        _uiState.value = _uiState.value.copy(
-            showClearAllDialog = false
-        )
+        updateState { copy(showClearAllDialog = false) }
     }
 
     fun confirmClearAllDrafts() {
@@ -122,12 +133,14 @@ class DraftsViewModel(
                 }
             }
 
-            _uiState.value = _uiState.value.copy(
-                drafts = if (hadError) _uiState.value.drafts else emptyList(),
-                pendingDeleteDraft = null,
-                showClearAllDialog = false,
-                errorMessage = if (hadError) "Some drafts could not be deleted." else null
-            )
+            updateState {
+                copy(
+                    drafts = if (hadError) drafts else emptyList(),
+                    pendingDeleteDraft = null,
+                    showClearAllDialog = false,
+                    errorMessage = if (hadError) "Some drafts could not be deleted." else null
+                )
+            }
 
             UiMessageManager.showMessage(
                 if (hadError) "Some drafts could not be deleted." else "All drafts cleared."
@@ -138,6 +151,8 @@ class DraftsViewModel(
             }
         }
     }
+
+    /* ---------- Mapping ---------- */
 
     private fun DraftDto.toDraft(): Draft {
         val chosenRewrite = when (tone) {
@@ -158,10 +173,19 @@ class DraftsViewModel(
 
     private fun parseTimestamp(value: String?): Long {
         if (value.isNullOrBlank()) return 0L
+
         return try {
-            LocalDateTime.parse(value).toInstant(ZoneOffset.UTC).toEpochMilli()
+            LocalDateTime.parse(value)
+                .toInstant(ZoneOffset.UTC)
+                .toEpochMilli()
         } catch (_: Exception) {
             0L
         }
+    }
+
+    /* ---------- Helpers ---------- */
+
+    private inline fun updateState(transform: DraftsUiState.() -> DraftsUiState) {
+        _uiState.value = _uiState.value.transform()
     }
 }

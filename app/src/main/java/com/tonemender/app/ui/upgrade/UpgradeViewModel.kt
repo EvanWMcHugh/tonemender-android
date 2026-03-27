@@ -14,6 +14,7 @@ import com.tonemender.app.data.repository.AuthRepository
 import com.tonemender.app.ui.common.UiMessageManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class UpgradeViewModel(
@@ -25,7 +26,7 @@ class UpgradeViewModel(
     private val sessionStore = SessionStore(application.applicationContext)
 
     private val _uiState = MutableStateFlow(UpgradeUiState())
-    val uiState: StateFlow<UpgradeUiState> = _uiState
+    val uiState: StateFlow<UpgradeUiState> = _uiState.asStateFlow()
 
     init {
         observeBilling()
@@ -34,15 +35,19 @@ class UpgradeViewModel(
         }
     }
 
+    /* ---------- Billing Observers ---------- */
+
     private fun observeBilling() {
         viewModelScope.launch {
             billingManager.uiModel.collect { model ->
-                _uiState.value = _uiState.value.copy(
-                    monthlyPriceLabel = model.monthlyPlan?.formattedPrice ?: "",
-                    yearlyPriceLabel = model.yearlyPlan?.formattedPrice ?: "",
-                    isLoading = model.isConnecting || model.isLoadingProducts,
-                    errorMessage = model.errorMessage
-                )
+                updateState {
+                    copy(
+                        monthlyPriceLabel = model.monthlyPlan?.formattedPrice.orEmpty(),
+                        yearlyPriceLabel = model.yearlyPlan?.formattedPrice.orEmpty(),
+                        isLoading = model.isConnecting || model.isLoadingProducts,
+                        errorMessage = model.errorMessage
+                    )
+                }
             }
         }
 
@@ -52,19 +57,17 @@ class UpgradeViewModel(
                     BillingPurchaseEvent.None -> Unit
 
                     BillingPurchaseEvent.Cancelled -> {
-                        _uiState.value = _uiState.value.copy(
-                            isPurchasing = false,
-                            errorMessage = null
-                        )
+                        updateState {
+                            copy(isPurchasing = false, errorMessage = null)
+                        }
                         UiMessageManager.showMessage("Purchase cancelled.")
                         billingManager.consumePurchaseEvent()
                     }
 
                     is BillingPurchaseEvent.Error -> {
-                        _uiState.value = _uiState.value.copy(
-                            isPurchasing = false,
-                            errorMessage = event.message
-                        )
+                        updateState {
+                            copy(isPurchasing = false, errorMessage = event.message)
+                        }
                         billingManager.consumePurchaseEvent()
                     }
 
@@ -77,13 +80,17 @@ class UpgradeViewModel(
         }
     }
 
+    /* ---------- Purchase Handling ---------- */
+
     private fun handleSuccessfulPurchase(purchase: Purchase) {
-        billingManager.acknowledgePurchase(purchase) { acknowledged, acknowledgeMessage ->
+        billingManager.acknowledgePurchase(purchase) { acknowledged, message ->
             if (!acknowledged) {
-                _uiState.value = _uiState.value.copy(
-                    isPurchasing = false,
-                    errorMessage = acknowledgeMessage ?: "Could not acknowledge purchase."
-                )
+                updateState {
+                    copy(
+                        isPurchasing = false,
+                        errorMessage = message ?: "Could not acknowledge purchase."
+                    )
+                }
                 return@acknowledgePurchase
             }
 
@@ -93,10 +100,12 @@ class UpgradeViewModel(
                     val productId = purchase.products.firstOrNull()
 
                     if (purchaseToken.isBlank() || productId.isNullOrBlank()) {
-                        _uiState.value = _uiState.value.copy(
-                            isPurchasing = false,
-                            errorMessage = "Missing purchase details."
-                        )
+                        updateState {
+                            copy(
+                                isPurchasing = false,
+                                errorMessage = "Missing purchase details."
+                            )
+                        }
                         return@launch
                     }
 
@@ -112,35 +121,39 @@ class UpgradeViewModel(
                     )
 
                     if (response.isSuccessful) {
-                        _uiState.value = _uiState.value.copy(
-                            isPurchasing = false,
-                            errorMessage = null
-                        )
+                        updateState {
+                            copy(isPurchasing = false, errorMessage = null)
+                        }
 
                         sessionStore.triggerRefresh()
                         UiMessageManager.showMessage("Purchase verified successfully.")
                     } else {
-                        _uiState.value = _uiState.value.copy(
-                            isPurchasing = false,
-                            errorMessage = ApiErrorParser.parseMessage(response)
-                                ?: "Purchase verification failed."
-                        )
+                        updateState {
+                            copy(
+                                isPurchasing = false,
+                                errorMessage = ApiErrorParser.parseMessage(response)
+                                    ?: "Purchase verification failed."
+                            )
+                        }
                     }
                 } catch (e: Exception) {
-                    _uiState.value = _uiState.value.copy(
-                        isPurchasing = false,
-                        errorMessage = e.message ?: "Purchase verification failed."
-                    )
+                    updateState {
+                        copy(
+                            isPurchasing = false,
+                            errorMessage = e.message ?: "Purchase verification failed."
+                        )
+                    }
                 }
             }
         }
     }
 
+    /* ---------- Actions ---------- */
+
     fun selectPlan(plan: UpgradePlan) {
-        _uiState.value = _uiState.value.copy(
-            selectedPlan = plan,
-            errorMessage = null
-        )
+        updateState {
+            copy(selectedPlan = plan, errorMessage = null)
+        }
     }
 
     fun startPurchase(activity: Activity) {
@@ -152,29 +165,34 @@ class UpgradeViewModel(
             UpgradePlan.YEARLY -> BillingPlanType.YEARLY
         }
 
-        _uiState.value = state.copy(
-            isPurchasing = true,
-            errorMessage = null
-        )
+        updateState {
+            copy(isPurchasing = true, errorMessage = null)
+        }
 
         val launched = billingManager.launchPurchase(activity, billingPlanType)
         if (!launched) {
-            _uiState.value = _uiState.value.copy(
-                isPurchasing = false,
-                errorMessage = "Could not start purchase flow."
-            )
+            updateState {
+                copy(
+                    isPurchasing = false,
+                    errorMessage = "Could not start purchase flow."
+                )
+            }
         }
     }
 
     fun refreshPlans() {
-        _uiState.value = _uiState.value.copy(
-            errorMessage = null
-        )
+        updateState { copy(errorMessage = null) }
         billingManager.loadProducts()
     }
 
     override fun onCleared() {
         billingManager.endConnection()
         super.onCleared()
+    }
+
+    /* ---------- Helpers ---------- */
+
+    private inline fun updateState(transform: UpgradeUiState.() -> UpgradeUiState) {
+        _uiState.value = _uiState.value.transform()
     }
 }

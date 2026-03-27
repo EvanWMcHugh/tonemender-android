@@ -64,28 +64,29 @@ fun ToneMenderTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    val view = LocalView.current
 
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context)
-            else dynamicLightColorScheme(context)
+            if (darkTheme) {
+                dynamicDarkColorScheme(context)
+            } else {
+                dynamicLightColorScheme(context)
+            }
         }
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
 
-    val view = LocalView.current
-
     if (!view.isInEditMode) {
         SideEffect {
+            val activity = view.context as? Activity ?: return@SideEffect
+            val window = activity.window
+            val insetsController = WindowCompat.getInsetsController(window, view)
 
-            val window = (view.context as Activity).window
-
-            val controller = WindowCompat.getInsetsController(window, view)
-
-            controller.isAppearanceLightStatusBars = !darkTheme
-            controller.isAppearanceLightNavigationBars = !darkTheme
+            insetsController.isAppearanceLightStatusBars = !darkTheme
+            insetsController.isAppearanceLightNavigationBars = !darkTheme
         }
     }
 
@@ -95,8 +96,9 @@ fun ToneMenderTheme(
         shapes = ToneMenderShapes
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.background,
-            content = content
-        )
+            color = MaterialTheme.colorScheme.background
+        ) {
+            content()
+        }
     }
 }

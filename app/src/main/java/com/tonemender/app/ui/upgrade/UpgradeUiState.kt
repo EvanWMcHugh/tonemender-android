@@ -11,10 +11,15 @@ data class UpgradeUiState(
     val isPurchasing: Boolean = false,
     val errorMessage: String? = null
 ) {
-    val hasPlans: Boolean
-        get() = monthlyPriceLabel.isNotBlank() || yearlyPriceLabel.isNotBlank()
-}
+    val hasMonthlyPlan: Boolean
+        get() = monthlyPriceLabel.isNotBlank()
 
+    val hasYearlyPlan: Boolean
+        get() = yearlyPriceLabel.isNotBlank()
+
+    val hasPlans: Boolean
+        get() = hasMonthlyPlan || hasYearlyPlan
+}
 enum class UpgradePlan {
     MONTHLY,
     YEARLY

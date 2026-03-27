@@ -1,10 +1,6 @@
 package com.tonemender.app.ui.navigation
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -37,11 +33,17 @@ fun ToneMenderNavGraph(
         startDestination = startDestination,
         modifier = modifier
     ) {
+
+        // Auth
         composable(AppScreen.SignIn.route) {
             SignInScreen(
-                onGoToSignUp = { navController.navigate(AppScreen.SignUp.route) },
+                onGoToSignUp = {
+                    navController.navigate(AppScreen.SignUp.route)
+                },
                 onGoToForgotPassword = { email ->
-                    navController.navigate(AppScreen.ForgotPassword.createRoute(email))
+                    navController.navigate(
+                        AppScreen.ForgotPassword.createRoute(email)
+                    )
                 },
                 sessionViewModel = sessionViewModel
             )
@@ -62,12 +64,16 @@ fun ToneMenderNavGraph(
                     nullable = false
                 }
             )
-        ) {
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+
             ForgotPasswordScreen(
+                prefilledEmail = email,
                 onBack = { navController.popBackStack() }
             )
         }
 
+        // Main App
         composable(AppScreen.Rewrite.route) {
             RewriteScreen(
                 onGoToDrafts = {
@@ -111,15 +117,13 @@ fun ToneMenderNavGraph(
                     navController.navigate(AppScreen.DeleteAccount.route)
                 },
                 onSignOut = {
-                    navController.navigate(AppScreen.SignIn.route) {
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                        launchSingleTop = true
-                    }
+                    sessionViewModel.signOut()
                 },
                 sessionViewModel = sessionViewModel
             )
         }
 
+        // Account Actions
         composable(AppScreen.ChangeEmail.route) {
             ChangeEmailScreen(
                 onBack = { navController.popBackStack() }
@@ -135,6 +139,7 @@ fun ToneMenderNavGraph(
             )
         }
 
+        // Billing
         composable(AppScreen.Upgrade.route) {
             UpgradeScreen(
                 onBack = { navController.popBackStack() }
@@ -143,6 +148,9 @@ fun ToneMenderNavGraph(
     }
 }
 
+/**
+ * Prevent duplicate destinations in back stack
+ */
 private fun NavHostController.navigateSingleTopTo(route: String) {
     navigate(route) {
         launchSingleTop = true

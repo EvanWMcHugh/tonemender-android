@@ -38,36 +38,17 @@ fun DeleteAccountScreen(
         viewModel.loadCurrentUser()
     }
 
-    if (uiState.showConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = viewModel::cancelDelete,
-            title = {
-                Text("Delete account?")
-            },
-            text = {
-                Text("This permanently deletes your ToneMender account and cannot be undone.")
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.confirmDelete {
-                            sessionViewModel.signOut()
-                            onDeleted()
-                        }
-                    }
-                ) {
-                    Text("Delete Account")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = viewModel::cancelDelete
-                ) {
-                    Text("Cancel")
-                }
+    DeleteAccountDialog(
+        visible = uiState.showConfirmDialog,
+        isDeleting = uiState.isDeleting,
+        onConfirm = {
+            viewModel.confirmDelete {
+                sessionViewModel.signOut()
+                onDeleted()
             }
-        )
-    }
+        },
+        onDismiss = viewModel::cancelDelete
+    )
 
     Column(
         modifier = Modifier
@@ -77,70 +58,144 @@ fun DeleteAccountScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = "Delete Account",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Text(
-                text = "This action is permanent and cannot be undone.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+        DeleteAccountHeader()
 
         if (uiState.isLoading) {
-            CircularProgressIndicator()
+            LoadingSection()
         } else {
-            ElevatedCard(
+            DeleteAccountContent(
+                email = uiState.email,
+                errorMessage = uiState.errorMessage,
+                isDeleting = uiState.isDeleting,
+                onRequestDelete = viewModel::requestDelete,
+                onBack = onBack
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeleteAccountHeader() {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = "Delete Account",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Text(
+            text = "This action is permanent and cannot be undone.",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun LoadingSection() {
+    CircularProgressIndicator()
+}
+
+@Composable
+private fun DeleteAccountContent(
+    email: String?,
+    errorMessage: String?,
+    isDeleting: Boolean,
+    onRequestDelete: () -> Unit,
+    onBack: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Signed in as",
+                style = MaterialTheme.typography.labelMedium
+            )
+
+            Text(
+                text = email ?: "Unknown",
+                style = MaterialTheme.typography.bodyLarge
+            )
+
+            Text(
+                text = "Deleting your account will remove access to your app account and current session.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            errorMessage?.let {
+                ErrorText(it)
+            }
+
+            Button(
+                onClick = onRequestDelete,
+                enabled = !isDeleting,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Signed in as",
-                        style = MaterialTheme.typography.labelMedium
-                    )
-
-                    Text(
-                        text = uiState.email ?: "Unknown",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-
-                    Text(
-                        text = "Deleting your account will remove access to your app account and current session.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    uiState.errorMessage?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    Button(
-                        onClick = viewModel::requestDelete,
-                        enabled = !uiState.isDeleting,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (uiState.isDeleting) {
-                            CircularProgressIndicator(strokeWidth = 2.dp)
-                        } else {
-                            Text("Delete Account")
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = onBack,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Back")
-                    }
+                if (isDeleting) {
+                    CircularProgressIndicator(strokeWidth = 2.dp)
+                } else {
+                    Text("Delete Account")
                 }
+            }
+
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Back")
             }
         }
     }
+}
+
+@Composable
+private fun DeleteAccountDialog(
+    visible: Boolean,
+    isDeleting: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Delete account?")
+        },
+        text = {
+            Text("This permanently deletes your ToneMender account and cannot be undone.")
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isDeleting
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(strokeWidth = 2.dp)
+                } else {
+                    Text("Delete Account")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isDeleting
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun ErrorText(message: String) {
+    Text(
+        text = message,
+        color = MaterialTheme.colorScheme.error
+    )
 }

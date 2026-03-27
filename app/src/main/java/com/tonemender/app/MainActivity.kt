@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
                 val isReady by sessionViewModel.isReady.collectAsState()
                 val isSignedIn by sessionViewModel.isSignedIn.collectAsState()
 
-                LaunchedEffect(Unit) {
+                LaunchedEffect(snackbarHostState) {
                     UiMessageManager.messages.collect { message ->
                         snackbarHostState.showSnackbar(message)
                     }
@@ -60,23 +60,11 @@ class MainActivity : ComponentActivity() {
                         }
                     ) { innerPadding ->
                         if (!isReady) {
-                            Box(
+                            LoadingScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(innerPadding),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    CircularProgressIndicator()
-                                    Text(
-                                        text = "Loading ToneMender…",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
+                                    .padding(innerPadding)
+                            )
                         } else {
                             key(isSignedIn) {
                                 val navController = rememberNavController()
@@ -98,6 +86,25 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun LoadingScreen(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = "Loading ToneMender…",
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }

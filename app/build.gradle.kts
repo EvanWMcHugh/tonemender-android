@@ -11,15 +11,24 @@ android {
         applicationId = "com.tonemender.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.0.8"
+        versionCode = 10
+        versionName = "1.0.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "BASE_URL", "\"https://tonemender.com/\"")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "BASE_URL", "\"https://tonemender.com/\"")
+        }
+
         release {
             isMinifyEnabled = false
+
+            buildConfigField("String", "BASE_URL", "\"https://tonemender.com/\"")
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -61,6 +70,7 @@ dependencies {
     implementation(libs.okhttp.logging.interceptor)
 
     implementation(libs.androidx.datastore.preferences)
+
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
 
@@ -68,6 +78,7 @@ dependencies {
     implementation(libs.play.billing)
 
     testImplementation(libs.junit)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

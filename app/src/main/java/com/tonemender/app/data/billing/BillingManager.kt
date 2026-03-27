@@ -40,7 +40,9 @@ class BillingManager(
     private val billingClient: BillingClient = BillingClient.newBuilder(appContext)
         .setListener(this)
         .enablePendingPurchases(
-            PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
+            PendingPurchasesParams.newBuilder()
+                .enableOneTimeProducts()
+                .build()
         )
         .enableAutoServiceReconnection()
         .build()
@@ -49,64 +51,74 @@ class BillingManager(
 
     fun connect(onConnected: (() -> Unit)? = null) {
         if (billingClient.isReady) {
-            _uiModel.value = _uiModel.value.copy(
-                isReady = true,
-                isConnecting = false,
-                errorMessage = null
-            )
-            onConnected?.invoke()
+            updateUiModel {
+                copy(
+                    isReady = true,
+                    isConnecting = false,
+                    errorMessage = null
+                )
+            }
             queryExistingPurchases()
+            onConnected?.invoke()
             return
         }
 
-        _uiModel.value = _uiModel.value.copy(
-            isConnecting = true,
-            errorMessage = null
-        )
+        updateUiModel {
+            copy(
+                isConnecting = true,
+                errorMessage = null
+            )
+        }
 
         billingClient.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(billingResult: BillingResult) {
                 if (billingResult.responseCode == BillingResponseCode.OK) {
-                    _uiModel.value = _uiModel.value.copy(
-                        isReady = true,
-                        isConnecting = false,
-                        errorMessage = null
-                    )
+                    updateUiModel {
+                        copy(
+                            isReady = true,
+                            isConnecting = false,
+                            errorMessage = null
+                        )
+                    }
                     queryExistingPurchases()
                     onConnected?.invoke()
                 } else {
-                    _uiModel.value = _uiModel.value.copy(
-                        isReady = false,
-                        isConnecting = false,
-                        errorMessage = billingResult.debugMessage.ifBlank {
-                            "Billing setup failed."
-                        }
-                    )
+                    updateUiModel {
+                        copy(
+                            isReady = false,
+                            isConnecting = false,
+                            errorMessage = billingResult.debugMessage.ifBlank {
+                                "Billing setup failed."
+                            }
+                        )
+                    }
                 }
             }
 
             override fun onBillingServiceDisconnected() {
-                _uiModel.value = _uiModel.value.copy(
-                    isReady = false,
-                    isConnecting = false,
-                    errorMessage = "Billing service disconnected."
-                )
+                updateUiModel {
+                    copy(
+                        isReady = false,
+                        isConnecting = false,
+                        errorMessage = "Billing service disconnected."
+                    )
+                }
             }
         })
     }
 
     fun loadProducts() {
         if (!billingClient.isReady) {
-            connect {
-                loadProducts()
-            }
+            connect { loadProducts() }
             return
         }
 
-        _uiModel.value = _uiModel.value.copy(
-            isLoadingProducts = true,
-            errorMessage = null
-        )
+        updateUiModel {
+            copy(
+                isLoadingProducts = true,
+                errorMessage = null
+            )
+        }
 
         val queryParams = QueryProductDetailsParams.newBuilder()
             .setProductList(
@@ -121,22 +133,28 @@ class BillingManager(
 
         billingClient.queryProductDetailsAsync(queryParams) { billingResult, queryResult ->
             if (billingResult.responseCode != BillingResponseCode.OK) {
-                _uiModel.value = _uiModel.value.copy(
-                    isLoadingProducts = false,
-                    errorMessage = billingResult.debugMessage.ifBlank {
-                        "Could not load subscription options."
-                    }
-                )
+                updateUiModel {
+                    copy(
+                        isLoadingProducts = false,
+                        errorMessage = billingResult.debugMessage.ifBlank {
+                            "Could not load subscription options."
+                        }
+                    )
+                }
                 return@queryProductDetailsAsync
             }
 
             val productDetails = queryResult.productDetailsList.firstOrNull()
-
             if (productDetails == null) {
-                _uiModel.value = _uiModel.value.copy(
-                    isLoadingProducts = false,
-                    errorMessage = "No subscription product found."
-                )
+                cachedProductDetails = null
+                updateUiModel {
+                    copy(
+                        isLoadingProducts = false,
+                        monthlyPlan = null,
+                        yearlyPlan = null,
+                        errorMessage = "No subscription product found."
+                    )
+                }
                 return@queryProductDetailsAsync
             }
 
@@ -144,37 +162,41 @@ class BillingManager(
 
             val subscriptionOffers = productDetails.subscriptionOfferDetails.orEmpty()
 
-            val monthlyOffer = subscriptionOffers.find { it.basePlanId == MONTHLY_BASE_PLAN_ID }
-            val yearlyOffer = subscriptionOffers.find { it.basePlanId == YEARLY_BASE_PLAN_ID }
+            val monthlyPlan = subscriptionOffers
+                .find { it.basePlanId == MONTHLY_BASE_PLAN_ID }
+                ?.toBillingPlan(
+                    planType = BillingPlanType.MONTHLY,
+                    productDetails = productDetails
+                )
 
-            val monthlyPlan = monthlyOffer?.toBillingPlan(
-                planType = BillingPlanType.MONTHLY,
-                productDetails = productDetails
-            )
+            val yearlyPlan = subscriptionOffers
+                .find { it.basePlanId == YEARLY_BASE_PLAN_ID }
+                ?.toBillingPlan(
+                    planType = BillingPlanType.YEARLY,
+                    productDetails = productDetails
+                )
 
-            val yearlyPlan = yearlyOffer?.toBillingPlan(
-                planType = BillingPlanType.YEARLY,
-                productDetails = productDetails
-            )
-
-            _uiModel.value = _uiModel.value.copy(
-                isLoadingProducts = false,
-                monthlyPlan = monthlyPlan,
-                yearlyPlan = yearlyPlan,
-                errorMessage = if (monthlyPlan == null && yearlyPlan == null) {
-                    "No valid subscription plans found."
-                } else {
-                    null
-                }
-            )
+            updateUiModel {
+                copy(
+                    isLoadingProducts = false,
+                    monthlyPlan = monthlyPlan,
+                    yearlyPlan = yearlyPlan,
+                    errorMessage = if (monthlyPlan == null && yearlyPlan == null) {
+                        "No valid subscription plans found."
+                    } else {
+                        null
+                    }
+                )
+            }
         }
     }
 
     fun launchPurchase(activity: Activity, planType: BillingPlanType): Boolean {
         val productDetails = cachedProductDetails
         if (productDetails == null) {
-            _purchaseEvent.value =
+            emitPurchaseEvent(
                 BillingPurchaseEvent.Error("Subscription details are not loaded yet.")
+            )
             return false
         }
 
@@ -184,7 +206,9 @@ class BillingManager(
         }
 
         if (selectedPlan == null) {
-            _purchaseEvent.value = BillingPurchaseEvent.Error("Selected plan is unavailable.")
+            emitPurchaseEvent(
+                BillingPurchaseEvent.Error("Selected plan is unavailable.")
+            )
             return false
         }
 
@@ -198,10 +222,13 @@ class BillingManager(
             .build()
 
         val billingResult = billingClient.launchBillingFlow(activity, billingFlowParams)
-
         if (billingResult.responseCode != BillingResponseCode.OK) {
-            _purchaseEvent.value = BillingPurchaseEvent.Error(
-                billingResult.debugMessage.ifBlank { "Could not launch purchase flow." }
+            emitPurchaseEvent(
+                BillingPurchaseEvent.Error(
+                    billingResult.debugMessage.ifBlank {
+                        "Could not launch purchase flow."
+                    }
+                )
             )
             return false
         }
@@ -217,21 +244,25 @@ class BillingManager(
             BillingResponseCode.OK -> {
                 val purchase = purchases?.firstOrNull()
                 if (purchase != null) {
-                    _purchaseEvent.value = BillingPurchaseEvent.Success(purchase)
+                    emitPurchaseEvent(BillingPurchaseEvent.Success(purchase))
                 } else {
-                    _purchaseEvent.value = BillingPurchaseEvent.Error(
-                        "Purchase completed but no purchase data was returned."
+                    emitPurchaseEvent(
+                        BillingPurchaseEvent.Error(
+                            "Purchase completed but no purchase data was returned."
+                        )
                     )
                 }
             }
 
             BillingResponseCode.USER_CANCELED -> {
-                _purchaseEvent.value = BillingPurchaseEvent.Cancelled
+                emitPurchaseEvent(BillingPurchaseEvent.Cancelled)
             }
 
             else -> {
-                _purchaseEvent.value = BillingPurchaseEvent.Error(
-                    billingResult.debugMessage.ifBlank { "Purchase failed." }
+                emitPurchaseEvent(
+                    BillingPurchaseEvent.Error(
+                        billingResult.debugMessage.ifBlank { "Purchase failed." }
+                    )
                 )
             }
         }
@@ -251,7 +282,7 @@ class BillingManager(
                 purchase.products.contains(SUBSCRIPTION_PRODUCT_ID)
             } ?: return@queryPurchasesAsync
 
-            _purchaseEvent.value = BillingPurchaseEvent.Success(existing)
+            emitPurchaseEvent(BillingPurchaseEvent.Success(existing))
         }
     }
 
@@ -274,20 +305,32 @@ class BillingManager(
             } else {
                 onAcknowledged(
                     false,
-                    billingResult.debugMessage.ifBlank { "Could not acknowledge purchase." }
+                    billingResult.debugMessage.ifBlank {
+                        "Could not acknowledge purchase."
+                    }
                 )
             }
         }
     }
 
     fun consumePurchaseEvent() {
-        _purchaseEvent.value = BillingPurchaseEvent.None
+        emitPurchaseEvent(BillingPurchaseEvent.None)
     }
 
     fun endConnection() {
         if (billingClient.isReady) {
             billingClient.endConnection()
         }
+    }
+
+    private fun emitPurchaseEvent(event: BillingPurchaseEvent) {
+        _purchaseEvent.value = event
+    }
+
+    private inline fun updateUiModel(
+        transform: BillingUiModel.() -> BillingUiModel
+    ) {
+        _uiModel.value = _uiModel.value.transform()
     }
 
     private fun ProductDetails.SubscriptionOfferDetails.toBillingPlan(

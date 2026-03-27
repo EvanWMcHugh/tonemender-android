@@ -28,109 +28,154 @@ class DeleteAccountViewModel(
 
     fun loadCurrentUser() {
         viewModelScope.launch {
-            try {
-                _uiState.value = _uiState.value.copy(
+            updateState {
+                copy(
                     isLoading = true,
                     errorMessage = null
                 )
+            }
 
-                val response = authRepository.me()
+            try {
+                val response = authRepository.getMe()
+
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(
-                        email = response.body()?.user?.email,
-                        isLoading = false,
-                        errorMessage = null
-                    )
+                    updateState {
+                        copy(
+                            email = response.body()?.user?.email,
+                            isLoading = false,
+                            errorMessage = null
+                        )
+                    }
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = "Could not load account details."
-                    )
+                    updateState {
+                        copy(
+                            isLoading = false,
+                            errorMessage = "Could not load account details."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = e.message ?: "Network error."
-                )
+                updateState {
+                    copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "Network error."
+                    )
+                }
             }
         }
     }
 
     fun requestDelete() {
-        _uiState.value = _uiState.value.copy(
-            showConfirmDialog = true,
-            errorMessage = null
-        )
+        updateState {
+            copy(
+                showConfirmDialog = true,
+                errorMessage = null
+            )
+        }
     }
 
     fun cancelDelete() {
-        _uiState.value = _uiState.value.copy(
-            showConfirmDialog = false
-        )
+        updateState {
+            copy(showConfirmDialog = false)
+        }
     }
 
     fun confirmDelete(onSuccess: () -> Unit) {
-        val state = _uiState.value
-        val email = state.email.orEmpty()
+        val email = _uiState.value.email.orEmpty()
 
-        _uiState.value = state.copy(
-            isDeleting = true,
-            errorMessage = null,
-            showConfirmDialog = false
-        )
+        updateState {
+            copy(
+                isDeleting = true,
+                errorMessage = null,
+                showConfirmDialog = false
+            )
+        }
 
         viewModelScope.launch {
             try {
-                val requestHash = PlayIntegrityManager.buildRequestHash(
-                    "delete_account",
+                val integrity = getIntegrityToken(
+                    action = "delete_account",
                     email
-                )
-
-                val prepareResult = playIntegrityManager.prepare()
-                if (prepareResult.isFailure) {
-                    _uiState.value = _uiState.value.copy(
-                        isDeleting = false,
-                        errorMessage = prepareResult.exceptionOrNull()?.message
-                            ?: "Could not prepare integrity check."
-                    )
-                    return@launch
-                }
-
-                val tokenResult = playIntegrityManager.requestToken(requestHash)
-                val integrityToken = tokenResult.getOrElse {
-                    _uiState.value = _uiState.value.copy(
-                        isDeleting = false,
-                        errorMessage = it.message ?: "Could not get integrity token."
-                    )
-                    return@launch
-                }
+                ) ?: return@launch
 
                 val response = authRepository.deleteAccount(
-                    integrityToken = integrityToken,
-                    integrityRequestHash = requestHash
+                    integrityToken = integrity.token,
+                    integrityRequestHash = integrity.requestHash
                 )
 
                 if (response.isSuccessful) {
                     authRepository.clearSession()
                     UiMessageManager.showMessage("Your account has been deleted.")
-                    _uiState.value = _uiState.value.copy(
-                        isDeleting = false,
-                        errorMessage = null
-                    )
+
+                    updateState {
+                        copy(
+                            isDeleting = false,
+                            errorMessage = null
+                        )
+                    }
+
                     onSuccess()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isDeleting = false,
-                        errorMessage = ApiErrorParser.parseMessage(response)
-                            ?: "Could not delete account."
-                    )
+                    updateState {
+                        copy(
+                            isDeleting = false,
+                            errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: "Could not delete account."
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isDeleting = false,
-                    errorMessage = e.message ?: "Network error."
-                )
+                updateState {
+                    copy(
+                        isDeleting = false,
+                        errorMessage = e.message ?: "Network error."
+                    )
+                }
             }
         }
     }
+
+    private suspend fun getIntegrityToken(
+        action: String,
+        vararg inputs: String
+    ): IntegrityResult? {
+        val requestHash = PlayIntegrityManager.buildRequestHash(action, *inputs)
+
+        val prepareResult = playIntegrityManager.prepare()
+        if (prepareResult.isFailure) {
+            updateState {
+                copy(
+                    isDeleting = false,
+                    errorMessage = prepareResult.exceptionOrNull()?.message
+                        ?: "Could not prepare integrity check."
+                )
+            }
+            return null
+        }
+
+        val tokenResult = playIntegrityManager.requestToken(requestHash)
+        val token = tokenResult.getOrElse {
+            updateState {
+                copy(
+                    isDeleting = false,
+                    errorMessage = it.message ?: "Could not get integrity token."
+                )
+            }
+            return null
+        }
+
+        return IntegrityResult(
+            token = token,
+            requestHash = requestHash
+        )
+    }
+
+    private inline fun updateState(transform: DeleteAccountUiState.() -> DeleteAccountUiState) {
+        _uiState.value = _uiState.value.transform()
+    }
+
+    private data class IntegrityResult(
+        val token: String,
+        val requestHash: String
+    )
 }
