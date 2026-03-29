@@ -7,9 +7,7 @@ data class RewriteUiState(
     val rewrittenMessage: String = "",
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val editingDraftId: String? = null,
     val isPro: Boolean = false,
-
     val originalMessageSnapshot: String? = null,
     val toneScore: Int? = null,
     val emotionalImpact: String? = null,

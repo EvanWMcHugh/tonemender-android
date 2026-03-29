@@ -34,8 +34,6 @@ class RewriteViewModel(
     fun refreshUsage() = loadUsage()
     fun refreshUser() = loadUser()
 
-    /* ---------- Loaders ---------- */
-
     private fun loadUser() {
         viewModelScope.launch {
             try {
@@ -65,8 +63,6 @@ class RewriteViewModel(
         }
     }
 
-    /* ---------- Input ---------- */
-
     fun updateMessage(value: String) {
         updateState {
             copy(
@@ -83,8 +79,6 @@ class RewriteViewModel(
     fun updateRecipient(value: String?) {
         updateState { copy(selectedRecipient = value, errorMessage = null) }
     }
-
-    /* ---------- Rewrite ---------- */
 
     fun rewrite() {
         val state = _uiState.value
@@ -187,8 +181,6 @@ class RewriteViewModel(
         }
     }
 
-    /* ---------- Drafts ---------- */
-
     fun saveDraft() {
         val state = _uiState.value
         val original = state.message.trim()
@@ -203,32 +195,14 @@ class RewriteViewModel(
 
         viewModelScope.launch {
             try {
-                val response = if (state.editingDraftId != null) {
-                    rewriteRepository.updateDraft(
-                        draftId = state.editingDraftId,
-                        originalMessage = original,
-                        rewrittenMessage = rewritten,
-                        recipient = state.selectedRecipient.takeIf { state.isPro },
-                        tone = state.selectedTone.takeIf { state.isPro }
-                    )
-                } else {
-                    rewriteRepository.createDraft(
-                        originalMessage = original,
-                        rewrittenMessage = rewritten,
-                        recipient = state.selectedRecipient.takeIf { state.isPro },
-                        tone = state.selectedTone.takeIf { state.isPro }
-                    )
-                }
+                val response = rewriteRepository.createDraft(
+                    originalMessage = original,
+                    rewrittenMessage = rewritten,
+                    tone = state.selectedTone.takeIf { state.isPro }
+                )
 
                 if (response.isSuccessful) {
-                    val returnedId = response.body()?.draft?.id
-                    updateState {
-                        copy(editingDraftId = returnedId ?: editingDraftId)
-                    }
-
-                    UiMessageManager.showMessage(
-                        if (state.editingDraftId != null) "Draft updated." else "Draft saved."
-                    )
+                    UiMessageManager.showMessage("Draft saved.")
                 } else {
                     updateState {
                         copy(
@@ -252,7 +226,6 @@ class RewriteViewModel(
                 rewrittenMessage = draft.rewrittenMessage,
                 selectedRecipient = draft.recipient,
                 selectedTone = draft.tone,
-                editingDraftId = draft.id,
                 originalMessageSnapshot = draft.originalMessage,
                 isLoading = false,
                 errorMessage = null,
@@ -261,8 +234,6 @@ class RewriteViewModel(
             )
         }
     }
-
-    /* ---------- Actions ---------- */
 
     fun revertToOriginalMessage() {
         _uiState.value.originalMessageSnapshot?.let {
@@ -288,8 +259,6 @@ class RewriteViewModel(
     fun shareRewrite() {
         UiMessageManager.showMessage("Opening share sheet…")
     }
-
-    /* ---------- Helpers ---------- */
 
     private inline fun updateState(transform: RewriteUiState.() -> RewriteUiState) {
         _uiState.value = _uiState.value.transform()

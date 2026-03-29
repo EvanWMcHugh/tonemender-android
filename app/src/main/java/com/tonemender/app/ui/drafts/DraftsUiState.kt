@@ -6,7 +6,7 @@ data class DraftsUiState(
     val drafts: List<Draft> = emptyList(),
     val pendingDeleteDraft: Draft? = null,
     val showClearAllDialog: Boolean = false,
-    val errorMessage: String? = null
+    val loadErrorMessage: String? = null
 ) {
     val isEmpty: Boolean
         get() = drafts.isEmpty()

@@ -21,8 +21,6 @@ class DraftsViewModel(
     private val _uiState = MutableStateFlow(DraftsUiState())
     val uiState: StateFlow<DraftsUiState> = _uiState.asStateFlow()
 
-    /* ---------- Load ---------- */
-
     fun loadDrafts() {
         viewModelScope.launch {
             try {
@@ -38,20 +36,20 @@ class DraftsViewModel(
                     updateState {
                         copy(
                             drafts = drafts,
-                            errorMessage = null
+                            loadErrorMessage = null
                         )
                     }
                 } else {
                     updateState {
                         copy(
-                            errorMessage = ApiErrorParser.parseMessage(response)
+                            loadErrorMessage = ApiErrorParser.parseMessage(response)
                                 ?: "Failed to load drafts."
                         )
                     }
                 }
             } catch (e: Exception) {
                 updateState {
-                    copy(errorMessage = e.message ?: "Failed to load drafts.")
+                    copy(loadErrorMessage = e.message ?: "Failed to load drafts.")
                 }
             }
         }
@@ -60,8 +58,6 @@ class DraftsViewModel(
     fun openDraft(draft: Draft, onOpened: (Draft) -> Unit) {
         onOpened(draft)
     }
-
-    /* ---------- Delete single ---------- */
 
     fun requestDeleteDraft(draft: Draft) {
         updateState { copy(pendingDeleteDraft = draft) }
@@ -82,33 +78,29 @@ class DraftsViewModel(
                     updateState {
                         copy(
                             drafts = drafts.filterNot { it.id == draft.id },
-                            pendingDeleteDraft = null,
-                            errorMessage = null
+                            pendingDeleteDraft = null
                         )
                     }
 
                     UiMessageManager.showMessage("Draft deleted.")
                 } else {
                     updateState {
-                        copy(
-                            pendingDeleteDraft = null,
-                            errorMessage = ApiErrorParser.parseMessage(response)
-                                ?: "Failed to delete draft."
-                        )
+                        copy(pendingDeleteDraft = null)
                     }
+
+                    UiMessageManager.showMessage(
+                        ApiErrorParser.parseMessage(response) ?: "Failed to delete draft."
+                    )
                 }
             } catch (e: Exception) {
                 updateState {
-                    copy(
-                        pendingDeleteDraft = null,
-                        errorMessage = e.message ?: "Failed to delete draft."
-                    )
+                    copy(pendingDeleteDraft = null)
                 }
+
+                UiMessageManager.showMessage(e.message ?: "Failed to delete draft.")
             }
         }
     }
-
-    /* ---------- Clear all ---------- */
 
     fun requestClearAllDrafts() {
         updateState { copy(showClearAllDialog = true) }
@@ -119,40 +111,38 @@ class DraftsViewModel(
     }
 
     fun confirmClearAllDrafts() {
-        val drafts = _uiState.value.drafts
-
         viewModelScope.launch {
-            var hadError = false
+            try {
+                val response = rewriteRepository.deleteAllDrafts()
 
-            drafts.forEach { draft ->
-                try {
-                    val response = rewriteRepository.deleteDraft(draft.id)
-                    if (!response.isSuccessful) hadError = true
-                } catch (_: Exception) {
-                    hadError = true
+                if (response.isSuccessful) {
+                    updateState {
+                        copy(
+                            drafts = emptyList(),
+                            pendingDeleteDraft = null,
+                            showClearAllDialog = false
+                        )
+                    }
+
+                    UiMessageManager.showMessage("All drafts cleared.")
+                } else {
+                    updateState {
+                        copy(showClearAllDialog = false)
+                    }
+
+                    UiMessageManager.showMessage(
+                        ApiErrorParser.parseMessage(response) ?: "Failed to clear drafts."
+                    )
                 }
-            }
+            } catch (e: Exception) {
+                updateState {
+                    copy(showClearAllDialog = false)
+                }
 
-            updateState {
-                copy(
-                    drafts = if (hadError) drafts else emptyList(),
-                    pendingDeleteDraft = null,
-                    showClearAllDialog = false,
-                    errorMessage = if (hadError) "Some drafts could not be deleted." else null
-                )
-            }
-
-            UiMessageManager.showMessage(
-                if (hadError) "Some drafts could not be deleted." else "All drafts cleared."
-            )
-
-            if (hadError) {
-                loadDrafts()
+                UiMessageManager.showMessage(e.message ?: "Failed to clear drafts.")
             }
         }
     }
-
-    /* ---------- Mapping ---------- */
 
     private fun DraftDto.toDraft(): Draft {
         val chosenRewrite = when (tone) {
@@ -182,8 +172,6 @@ class DraftsViewModel(
             0L
         }
     }
-
-    /* ---------- Helpers ---------- */
 
     private inline fun updateState(transform: DraftsUiState.() -> DraftsUiState) {
         _uiState.value = _uiState.value.transform()

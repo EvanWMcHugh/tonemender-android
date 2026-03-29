@@ -3,6 +3,7 @@ package com.tonemender.app.data.remote.api
 import com.tonemender.app.data.remote.model.ChangeEmailRequest
 import com.tonemender.app.data.remote.model.CreateDraftRequest
 import com.tonemender.app.data.remote.model.DeleteAccountRequest
+import com.tonemender.app.data.remote.model.DeleteDraftRequest
 import com.tonemender.app.data.remote.model.DraftResponse
 import com.tonemender.app.data.remote.model.DraftsResponse
 import com.tonemender.app.data.remote.model.ForgotPasswordRequest
@@ -14,15 +15,11 @@ import com.tonemender.app.data.remote.model.RewriteRequest
 import com.tonemender.app.data.remote.model.RewriteResponse
 import com.tonemender.app.data.remote.model.SignInRequest
 import com.tonemender.app.data.remote.model.SignUpRequest
-import com.tonemender.app.data.remote.model.UpdateDraftRequest
 import com.tonemender.app.data.remote.model.UsageStatsResponse
 import retrofit2.Response
 import retrofit2.http.Body
-import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
-import retrofit2.http.PUT
-import retrofit2.http.Path
 
 interface ToneMenderApi {
 
@@ -82,16 +79,13 @@ interface ToneMenderApi {
         @Body request: CreateDraftRequest
     ): Response<DraftResponse>
 
-    @PUT("api/messages/{draftId}")
-    suspend fun updateDraft(
-        @Path("draftId") draftId: String,
-        @Body request: UpdateDraftRequest
-    ): Response<DraftResponse>
-
-    @DELETE("api/messages/{draftId}")
+    @POST("api/messages/delete")
     suspend fun deleteDraft(
-        @Path("draftId") draftId: String
+        @Body request: DeleteDraftRequest
     ): Response<GenericMessageResponse>
+
+    @POST("api/messages/delete-all")
+    suspend fun deleteAllDrafts(): Response<GenericMessageResponse>
 
     // Billing
     @POST("api/billing/google/verify")

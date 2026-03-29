@@ -62,7 +62,7 @@ fun DraftsScreen(
         DraftsHeader(
             draftCount = uiState.drafts.size,
             isEmpty = uiState.isEmpty,
-            errorMessage = uiState.errorMessage
+            errorMessage = uiState.loadErrorMessage
         )
 
         Spacer(modifier = Modifier.height(16.dp))

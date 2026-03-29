@@ -52,7 +52,7 @@ fun RewriteScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
-        HeaderSection(uiState.isPro, uiState.editingDraftId != null, onGoToUpgrade)
+        HeaderSection(uiState.isPro, onGoToUpgrade)
 
         MessageInputSection(uiState, viewModel)
 
@@ -86,7 +86,7 @@ fun RewriteScreen(
 /* ---------- Sections ---------- */
 
 @Composable
-private fun HeaderSection(isPro: Boolean, isEditing: Boolean, onUpgrade: () -> Unit) {
+private fun HeaderSection(isPro: Boolean, onUpgrade: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
@@ -94,8 +94,7 @@ private fun HeaderSection(isPro: Boolean, isEditing: Boolean, onUpgrade: () -> U
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("ToneMender Rewrite", style = MaterialTheme.typography.headlineMedium)
             Text(
-                if (isEditing) "Editing saved draft"
-                else "Rewrite your message with a better tone",
+                "Rewrite your message with a better tone",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -246,7 +245,7 @@ private fun RewriteResultSection(
             )
 
             Button(onClick = viewModel::saveDraft, modifier = Modifier.fillMaxWidth()) {
-                Text(if (uiState.editingDraftId != null) "Update Draft" else "Save Draft")
+                Text("Save Draft")
             }
 
             OutlinedButton(onClick = viewModel::useRewriteAsOriginal) {

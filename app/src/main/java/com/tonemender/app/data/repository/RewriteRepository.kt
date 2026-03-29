@@ -2,12 +2,12 @@ package com.tonemender.app.data.repository
 
 import com.tonemender.app.data.remote.NetworkModule
 import com.tonemender.app.data.remote.model.CreateDraftRequest
+import com.tonemender.app.data.remote.model.DeleteDraftRequest
 import com.tonemender.app.data.remote.model.DraftResponse
 import com.tonemender.app.data.remote.model.DraftsResponse
 import com.tonemender.app.data.remote.model.GenericMessageResponse
 import com.tonemender.app.data.remote.model.RewriteRequest
 import com.tonemender.app.data.remote.model.RewriteResponse
-import com.tonemender.app.data.remote.model.UpdateDraftRequest
 import com.tonemender.app.data.remote.model.UsageStatsResponse
 import retrofit2.Response
 
@@ -38,40 +38,26 @@ class RewriteRepository {
     suspend fun createDraft(
         originalMessage: String,
         rewrittenMessage: String,
-        recipient: String? = null,
         tone: String? = null
     ): Response<DraftResponse> {
         val request = CreateDraftRequest(
-            message = originalMessage,
-            rewrittenMessage = rewrittenMessage,
-            recipient = recipient,
-            tone = tone
+            original = originalMessage,
+            tone = tone,
+            softRewrite = if (tone == "soft") rewrittenMessage else null,
+            calmRewrite = if (tone == "calm") rewrittenMessage else null,
+            clearRewrite = if (tone == "clear" || tone == null) rewrittenMessage else null
         )
 
         return NetworkModule.api.createDraft(request)
     }
 
-    suspend fun updateDraft(
-        draftId: String,
-        originalMessage: String,
-        rewrittenMessage: String,
-        recipient: String? = null,
-        tone: String? = null
-    ): Response<DraftResponse> {
-        val request = UpdateDraftRequest(
-            message = originalMessage,
-            rewrittenMessage = rewrittenMessage,
-            recipient = recipient,
-            tone = tone
-        )
-
-        return NetworkModule.api.updateDraft(
-            draftId = draftId,
-            request = request
+    suspend fun deleteDraft(draftId: String): Response<GenericMessageResponse> {
+        return NetworkModule.api.deleteDraft(
+            DeleteDraftRequest(draftId = draftId)
         )
     }
 
-    suspend fun deleteDraft(draftId: String): Response<GenericMessageResponse> {
-        return NetworkModule.api.deleteDraft(draftId)
+    suspend fun deleteAllDrafts(): Response<GenericMessageResponse> {
+        return NetworkModule.api.deleteAllDrafts()
     }
 }
