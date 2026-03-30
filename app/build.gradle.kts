@@ -11,8 +11,8 @@ android {
         applicationId = "com.tonemender.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.1.1"
+        versionCode = 16
+        versionName = "1.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -25,7 +25,12 @@ android {
         }
 
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
 
             buildConfigField("String", "BASE_URL", "\"https://tonemender.com/\"")
 
