@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep Gson annotations and generic type info
+-keepattributes Signature,*Annotation*
+
+# Keep all network request/response models used by Retrofit/Gson
+-keep class com.tonemender.app.data.remote.model.** { *; }
+
+# Keep billing models if any are ever serialized or reflected
+-keep class com.tonemender.app.data.billing.** { *; }

@@ -11,8 +11,8 @@ android {
         applicationId = "com.tonemender.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 16
-        versionName = "1.1.5"
+        versionCode = 20
+        versionName = "1.1.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

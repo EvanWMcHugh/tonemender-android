@@ -3,8 +3,11 @@ package com.tonemender.app.data.remote.model
 import com.google.gson.annotations.SerializedName
 
 data class RewriteRequest(
+    @SerializedName("message")
     val message: String,
+    @SerializedName("recipient")
     val recipient: String?,
+    @SerializedName("tone")
     val tone: String?
 )
 
@@ -42,11 +45,15 @@ data class RewriteResponse(
 )
 
 data class UsageStatsDto(
+    @SerializedName("today")
     val today: Int = 0,
+    @SerializedName("total")
     val total: Int = 0
 )
 
 data class UsageStatsResponse(
+    @SerializedName("stats")
     val stats: UsageStatsDto = UsageStatsDto(),
+    @SerializedName("day")
     val day: String? = null
 )

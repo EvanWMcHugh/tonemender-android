@@ -96,7 +96,15 @@ class SignInViewModel(
                     }
                     onSuccess()
                 } else {
-                    val message = ApiErrorParser.parseMessage(response) ?: "Sign in failed."
+                    val rawError = try {
+                        response.errorBody()?.string()
+                    } catch (_: Exception) {
+                        null
+                    }
+
+                    val message = ApiErrorParser.parseMessage(response)
+                        ?: rawError
+                        ?: "Sign in failed."
 
                     updateState {
                         copy(
@@ -160,10 +168,17 @@ class SignInViewModel(
                         )
                     }
                 } else {
+                    val rawError = try {
+                        response.errorBody()?.string()
+                    } catch (_: Exception) {
+                        null
+                    }
+
                     updateState {
                         copy(
                             isResendingVerification = false,
                             errorMessage = ApiErrorParser.parseMessage(response)
+                                ?: rawError
                                 ?: "Could not resend verification email."
                         )
                     }
@@ -178,8 +193,6 @@ class SignInViewModel(
             }
         }
     }
-
-    // --- Helpers ---
 
     private suspend fun getIntegrityToken(
         action: String,
