@@ -49,13 +49,14 @@ class RewriteViewModel(
     private fun loadUsage() {
         viewModelScope.launch {
             try {
-                val response = rewriteRepository.getUsageStats()
+                val response = rewriteRepository.getUsage()
                 if (response.isSuccessful) {
-                    val stats = response.body()?.stats
+                    val rewritesLeft = response.body()?.rewritesLeft
+
                     updateState {
                         copy(
-                            usageToday = stats?.today ?: usageToday,
-                            usageTotal = stats?.total ?: usageTotal
+                            rewritesLeft = rewritesLeft,
+                            limitReached = rewritesLeft != null && rewritesLeft <= 0
                         )
                     }
                 }
@@ -139,6 +140,8 @@ class RewriteViewModel(
             return
         }
 
+        val rewritesLeft = body?.rewritesLeft
+
         updateState {
             copy(
                 isLoading = false,
@@ -147,12 +150,10 @@ class RewriteViewModel(
                 errorMessage = null,
                 toneScore = body?.toneScore,
                 emotionalImpact = body?.emotionalImpact,
-                usageToday = body?.usageToday ?: usageToday,
-                usageTotal = body?.usageTotal ?: usageTotal
+                rewritesLeft = rewritesLeft,
+                limitReached = rewritesLeft != null && rewritesLeft <= 0
             )
         }
-
-        loadUsage()
     }
 
     private fun handleRewriteException(message: String, e: Exception) {

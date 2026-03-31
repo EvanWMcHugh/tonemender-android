@@ -11,8 +11,8 @@ data class RewriteUiState(
     val originalMessageSnapshot: String? = null,
     val toneScore: Int? = null,
     val emotionalImpact: String? = null,
-    val usageToday: Int = 0,
-    val usageTotal: Int = 0
+    val rewritesLeft: Int? = null,
+    val limitReached: Boolean = false
 ) {
 
     val trimmedMessage: String

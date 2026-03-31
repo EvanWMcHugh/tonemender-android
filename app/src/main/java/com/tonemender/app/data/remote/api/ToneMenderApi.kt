@@ -15,6 +15,7 @@ import com.tonemender.app.data.remote.model.RewriteRequest
 import com.tonemender.app.data.remote.model.RewriteResponse
 import com.tonemender.app.data.remote.model.SignInRequest
 import com.tonemender.app.data.remote.model.SignUpRequest
+import com.tonemender.app.data.remote.model.UsageResponse
 import com.tonemender.app.data.remote.model.UsageStatsResponse
 import retrofit2.Response
 import retrofit2.http.Body
@@ -66,6 +67,9 @@ interface ToneMenderApi {
     suspend fun rewrite(
         @Body request: RewriteRequest
     ): Response<RewriteResponse>
+
+    @GET("api/usage")
+    suspend fun getUsage(): Response<UsageResponse>
 
     @GET("api/usage/stats")
     suspend fun getUsageStats(): Response<UsageStatsResponse>

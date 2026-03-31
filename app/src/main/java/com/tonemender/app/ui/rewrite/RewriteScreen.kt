@@ -4,13 +4,40 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tonemender.app.data.local.drafts.Draft
@@ -51,8 +78,18 @@ fun RewriteScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-
         HeaderSection(uiState.isPro, onGoToUpgrade)
+
+        if (!uiState.isPro && uiState.rewritesLeft != null && !uiState.limitReached) {
+            FreeUsageCard(
+                rewritesLeft = uiState.rewritesLeft,
+                onUpgrade = onGoToUpgrade
+            )
+        }
+
+        if (!uiState.isPro && uiState.limitReached) {
+            LimitReachedCard(onUpgrade = onGoToUpgrade)
+        }
 
         MessageInputSection(uiState, viewModel)
 
@@ -74,16 +111,14 @@ fun RewriteScreen(
         }
 
         if (uiState.hasRewrite) {
+            RewriteInsightsSection(uiState)
+            BeforeAfterCard(uiState)
             RewriteResultSection(uiState, viewModel, clipboard, context)
         }
 
         NavigationSection(onGoToDrafts, onGoToAccount, onGoToUpgrade)
-
-        UsageText(uiState)
     }
 }
-
-/* ---------- Sections ---------- */
 
 @Composable
 private fun HeaderSection(isPro: Boolean, onUpgrade: () -> Unit) {
@@ -103,6 +138,67 @@ private fun HeaderSection(isPro: Boolean, onUpgrade: () -> Unit) {
             onClick = { if (!isPro) onUpgrade() },
             label = { Text(if (isPro) "Pro" else "Free") }
         )
+    }
+}
+
+@Composable
+private fun FreeUsageCard(
+    rewritesLeft: Int?,
+    onUpgrade: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val title = when (rewritesLeft) {
+                null -> ""
+                0 -> "No free rewrites left today"
+                1 -> "⚠️ 1 free rewrite left today"
+                else -> "$rewritesLeft free rewrites left today"
+            }
+
+            Text(title, style = MaterialTheme.typography.titleMedium)
+
+            Text(
+                "Upgrade to ToneMender Pro for unlimited rewrites, tone control, and relationship types.",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Button(
+                onClick = onUpgrade,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Upgrade to Pro")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LimitReachedCard(onUpgrade: () -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "You’ve used all 3 free rewrites for today.",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                "Upgrade to ToneMender Pro to unlock tone control, relationship types, and unlimited rewrites.",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Button(
+                onClick = onUpgrade,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Upgrade to Pro")
+            }
+        }
     }
 }
 
@@ -177,7 +273,10 @@ private fun SelectionCard(
     onSelect: (String) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Text(title, style = MaterialTheme.typography.titleMedium)
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -201,7 +300,10 @@ private fun SelectionCard(
 @Composable
 private fun ProUpsellCard(onUpgrade: () -> Unit) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Text("Tone + Recipient are Pro features", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Upgrade to ToneMender Pro for better rewrites.",
@@ -222,8 +324,114 @@ private fun RewriteButton(isLoading: Boolean, enabled: Boolean, onClick: () -> U
         enabled = enabled,
         modifier = Modifier.fillMaxWidth()
     ) {
-        if (isLoading) CircularProgressIndicator(strokeWidth = 2.dp)
-        else Text("Rewrite")
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp
+            )
+        } else {
+            Text("Rewrite")
+        }
+    }
+}
+
+@Composable
+private fun RewriteInsightsSection(uiState: RewriteUiState) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        uiState.toneScore?.let { score ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ScoreCircle(score = score)
+                    Text(
+                        "Tone Score — higher means calmer, clearer, safer to send.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
+        uiState.emotionalImpact?.takeIf { it.isNotBlank() }?.let { emotion ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = emotion,
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScoreCircle(score: Int) {
+    Surface(
+        modifier = Modifier
+            .size(96.dp)
+            .clip(CircleShape),
+        tonalElevation = 2.dp
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Text(
+                text = score.toString(),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun BeforeAfterCard(uiState: RewriteUiState) {
+    val beforeText = uiState.originalMessageSnapshot?.takeIf { it.isNotBlank() }
+        ?: uiState.message.takeIf { it.isNotBlank() }
+        ?: return
+
+    val afterText = uiState.rewrittenMessage.takeIf { it.isNotBlank() } ?: return
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                "ToneMender — Before & After",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Before", style = MaterialTheme.typography.labelMedium)
+                OutlinedTextField(
+                    value = beforeText,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("After", style = MaterialTheme.typography.labelMedium)
+                OutlinedTextField(
+                    value = afterText,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+            }
+        }
     }
 }
 
@@ -235,20 +443,31 @@ private fun RewriteResultSection(
     context: Context
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                "Rewritten message",
+                style = MaterialTheme.typography.titleMedium
+            )
 
             OutlinedTextField(
                 value = uiState.rewrittenMessage,
                 onValueChange = {},
                 readOnly = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 4
             )
 
             Button(onClick = viewModel::saveDraft, modifier = Modifier.fillMaxWidth()) {
                 Text("Save Draft")
             }
 
-            OutlinedButton(onClick = viewModel::useRewriteAsOriginal) {
+            OutlinedButton(
+                onClick = viewModel::useRewriteAsOriginal,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text("Use this")
             }
 
@@ -258,7 +477,8 @@ private fun RewriteResultSection(
                         ClipData.newPlainText("Rewrite", uiState.rewrittenMessage)
                     )
                     viewModel.copyRewriteToClipboard()
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Copy")
             }
@@ -276,9 +496,33 @@ private fun RewriteResultSection(
                             "Share rewrite"
                         )
                     )
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Share")
+                Text("Share Rewrite")
+            }
+
+            OutlinedButton(
+                onClick = {
+                    val beforeText = uiState.originalMessageSnapshot?.takeIf { it.isNotBlank() }
+                        ?: uiState.message
+                    val shareText =
+                        "Before:\n$beforeText\n\nAfter:\n${uiState.rewrittenMessage}\n\nWritten with ToneMender"
+
+                    context.startActivity(
+                        Intent.createChooser(
+                            Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                                type = "text/plain"
+                            },
+                            "Share before and after"
+                        )
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Share Before/After Card")
             }
         }
     }
@@ -295,14 +539,6 @@ private fun NavigationSection(
         TextButton(onClick = onGoToAccount) { Text("Account") }
         TextButton(onClick = onGoToUpgrade) { Text("Upgrade") }
     }
-}
-
-@Composable
-private fun UsageText(uiState: RewriteUiState) {
-    Text(
-        text = "Usage today: ${uiState.usageToday} • Total rewrites: ${uiState.usageTotal}",
-        style = MaterialTheme.typography.bodySmall
-    )
 }
 
 @Composable

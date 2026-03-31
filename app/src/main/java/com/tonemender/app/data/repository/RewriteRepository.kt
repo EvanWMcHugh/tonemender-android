@@ -8,6 +8,7 @@ import com.tonemender.app.data.remote.model.DraftsResponse
 import com.tonemender.app.data.remote.model.GenericMessageResponse
 import com.tonemender.app.data.remote.model.RewriteRequest
 import com.tonemender.app.data.remote.model.RewriteResponse
+import com.tonemender.app.data.remote.model.UsageResponse
 import com.tonemender.app.data.remote.model.UsageStatsResponse
 import retrofit2.Response
 
@@ -25,6 +26,10 @@ class RewriteRepository {
         )
 
         return NetworkModule.api.rewrite(request)
+    }
+
+    suspend fun getUsage(): Response<UsageResponse> {
+        return NetworkModule.api.getUsage()
     }
 
     suspend fun getUsageStats(): Response<UsageStatsResponse> {

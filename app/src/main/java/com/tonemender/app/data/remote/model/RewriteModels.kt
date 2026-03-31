@@ -30,18 +30,20 @@ data class RewriteResponse(
 
     val day: String? = null,
 
-    @SerializedName("free_limit")
-    val freeLimit: Int? = null,
-
-    @SerializedName("rewrites_today")
-    val usageToday: Int? = null,
-
-    @SerializedName("total")
-    val usageTotal: Int? = null,
+    @SerializedName("rewrites_left")
+    val rewritesLeft: Int? = null,
 
     val error: String? = null,
     val message: String? = null,
     val code: String? = null
+)
+
+data class UsageResponse(
+    @SerializedName("rewrites_left")
+    val rewritesLeft: Int? = null,
+
+    @SerializedName("error")
+    val error: String? = null
 )
 
 data class UsageStatsDto(
