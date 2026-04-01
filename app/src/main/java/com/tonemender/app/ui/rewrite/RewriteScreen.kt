@@ -4,6 +4,17 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.core.graphics.applyCanvas
+import androidx.core.graphics.createBitmap
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
+import android.graphics.Bitmap
+import androidx.core.graphics.withSave
+import androidx.core.graphics.toColorInt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,8 +50,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tonemender.app.data.local.drafts.Draft
+import java.io.File
+import java.io.FileOutputStream
 
 private val toneOptions = listOf("soft", "calm", "clear")
 private val recipientOptions = listOf("partner", "friend", "family", "coworker")
@@ -506,18 +520,16 @@ private fun RewriteResultSection(
                 onClick = {
                     val beforeText = uiState.originalMessageSnapshot?.takeIf { it.isNotBlank() }
                         ?: uiState.message
-                    val shareText =
-                        "Before:\n$beforeText\n\nAfter:\n${uiState.rewrittenMessage}\n\nWritten with ToneMender"
 
-                    context.startActivity(
-                        Intent.createChooser(
-                            Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, shareText)
-                                type = "text/plain"
-                            },
-                            "Share before and after"
-                        )
+                    shareBeforeAfterImage(
+                        context = context,
+                        before = beforeText,
+                        after = uiState.rewrittenMessage,
+                        toneLabel = if (uiState.isPro) {
+                            uiState.selectedTone?.replaceFirstChar { it.uppercase() } ?: "Rewrite"
+                        } else {
+                            "Default"
+                        }
                     )
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -550,5 +562,225 @@ private fun ErrorText(message: String) {
 private fun rememberClipboard(context: Context): ClipboardManager {
     return remember(context) {
         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    }
+}
+
+private fun shareBeforeAfterImage(
+    context: Context,
+    before: String,
+    after: String,
+    toneLabel: String
+) {
+    try {
+        val bitmap = createBeforeAfterBitmap(
+            context = context,
+            before = before,
+            after = after,
+            toneLabel = toneLabel
+        )
+
+        val file = File(context.cacheDir, "tonemender_before_after.png")
+        FileOutputStream(file).use { stream ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        }
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            file
+        )
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(Intent.createChooser(shareIntent, "Share Before/After"))
+    } catch (_: Exception) {
+        val fallbackText = "Before:\n$before\n\nAfter:\n$after\n\nWritten with ToneMender"
+        context.startActivity(
+            Intent.createChooser(
+                Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, fallbackText)
+                    type = "text/plain"
+                },
+                "Share Before/After"
+            )
+        )
+    }
+}
+
+private fun createBeforeAfterBitmap(
+    context: Context,
+    before: String,
+    after: String,
+    toneLabel: String
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val width = 1080
+
+    val horizontalPadding = 28f * density
+    val topPadding = 28f * density
+    val sectionGap = 24f * density
+    val blockGap = 18f * density
+    val textInset = 22f * density
+    val cornerRadius = 24f * density
+    val headerHeight = 110f * density
+    val chipHeight = 52f * density
+    val sectionLabelHeight = 40f * density
+    val footerHeight = 50f * density
+
+    val titlePaint = boldTextPaint(Color.BLACK, 42f)
+    val subtitlePaint = boldTextPaint("#64748B".toColorInt(), 24f)
+    val chipPaint = boldTextPaint("#2563EB".toColorInt(), 22f)
+    val sectionTitlePaint = boldTextPaint(Color.BLACK, 28f)
+    val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = "#0F172A".toColorInt()
+        textSize = 26f
+    }
+    val footerPaint = boldTextPaint("#64748B".toColorInt(), 20f)
+
+    val textWidth =
+        width - (horizontalPadding * 2).toInt() - (textInset * 2).toInt()
+
+    val beforeLayout = buildTextLayout(before, bodyPaint, textWidth)
+    val afterLayout = buildTextLayout(after, bodyPaint, textWidth)
+
+    val beforeBoxHeight = beforeLayout.height + textInset * 2
+    val afterBoxHeight = afterLayout.height + textInset * 2
+
+    val totalHeight = (
+            topPadding +
+                    headerHeight +
+                    sectionGap +
+                    sectionLabelHeight +
+                    blockGap +
+                    beforeBoxHeight +
+                    sectionGap +
+                    sectionLabelHeight +
+                    blockGap +
+                    afterBoxHeight +
+                    sectionGap +
+                    footerHeight +
+                    topPadding
+            ).toInt()
+
+    val bitmap = createBitmap(width, totalHeight)
+
+    bitmap.applyCanvas {
+        val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.LinearGradient(
+                0f,
+                0f,
+                width.toFloat(),
+                totalHeight.toFloat(),
+                intArrayOf(Color.WHITE, "#F7FBFF".toColorInt()),
+                null,
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+
+        drawRect(0f, 0f, width.toFloat(), totalHeight.toFloat(), backgroundPaint)
+
+        var y = topPadding
+
+        drawText("ToneMender", horizontalPadding, y + 42f, titlePaint)
+        drawText("Before / After", horizontalPadding, y + 78f, subtitlePaint)
+
+        val chipWidth = chipPaint.measureText(toneLabel) + 64f
+        val chipLeft = width - horizontalPadding - chipWidth
+        val chipTop = y + 8f
+        val chipRect = RectF(chipLeft, chipTop, chipLeft + chipWidth, chipTop + chipHeight)
+
+        val chipBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = "#EAF2FF".toColorInt()
+        }
+
+        drawRoundRect(chipRect, chipHeight / 2, chipHeight / 2, chipBgPaint)
+
+        val chipTextY =
+            chipTop + chipHeight / 2 - (chipPaint.descent() + chipPaint.ascent()) / 2
+        drawText(toneLabel, chipLeft + 32f, chipTextY, chipPaint)
+
+        y += headerHeight + sectionGap
+
+        drawText("Before", horizontalPadding, y + 28f, sectionTitlePaint)
+        y += sectionLabelHeight + blockGap
+
+        val beforeRect = RectF(
+            horizontalPadding,
+            y,
+            width - horizontalPadding,
+            y + beforeBoxHeight
+        )
+        val beforeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = "#F1F5F9".toColorInt()
+        }
+        drawRoundRect(beforeRect, cornerRadius, cornerRadius, beforeBgPaint)
+
+        withSave {
+            translate(horizontalPadding + textInset, y + textInset)
+            afterLayout.draw(this)
+        }
+
+        y += beforeBoxHeight + sectionGap
+
+        drawText("After", horizontalPadding, y + 28f, sectionTitlePaint)
+        y += sectionLabelHeight + blockGap
+
+        val afterRect = RectF(
+            horizontalPadding,
+            y,
+            width - horizontalPadding,
+            y + afterBoxHeight
+        )
+        val afterBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = "#EAF2FF".toColorInt()
+        }
+        drawRoundRect(afterRect, cornerRadius, cornerRadius, afterBgPaint)
+
+        withSave {
+            translate(horizontalPadding + textInset, y + textInset)
+            beforeLayout.draw(this)
+        }
+
+        y += afterBoxHeight + sectionGap
+
+        val footerText = "Made with ToneMender"
+        val footerWidth = footerPaint.measureText(footerText)
+        drawText(
+            footerText,
+            width - horizontalPadding - footerWidth,
+            y + 20f,
+            footerPaint
+        )
+    }
+
+    return bitmap
+}
+
+private fun buildTextLayout(
+    text: String,
+    paint: TextPaint,
+    width: Int
+): StaticLayout {
+    return StaticLayout.Builder
+        .obtain(text, 0, text.length, paint, width)
+        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+        .setLineSpacing(0f, 1.15f)
+        .setIncludePad(false)
+        .build()
+}
+
+private fun boldTextPaint(color: Int, textSize: Float): TextPaint {
+    return TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        this.textSize = textSize
+        typeface = android.graphics.Typeface.create(
+            android.graphics.Typeface.DEFAULT,
+            android.graphics.Typeface.BOLD
+        )
     }
 }
